@@ -10,12 +10,12 @@ window.SF = window.SF || {};
     G.gold -= C.REFRESH_COST;
     if (G.current) G.current.tier = SF.util.pickDropTier();
     G.nextTier = SF.util.pickDropTier();
-    SF.ui.flashHint('投放队列已刷新'); SF.ui.update();
+    SF.ui.flashHint('投放队列已刷新'); SF.ui.update(); SF.save.write();
   }
   function spendRecruit() {
     const G = SF.G, C = SF.C;
     if (G.gold < C.RECRUIT_COST) { SF.ui.flashHint('金币不足，可看广告免费招募 →'); return; }
-    G.gold -= C.RECRUIT_COST; grantRecruit();
+    G.gold -= C.RECRUIT_COST; grantRecruit(); SF.save.write();
   }
   function grantRecruit() {
     const C = SF.C;
@@ -44,7 +44,7 @@ window.SF = window.SF || {};
     tryResultClick(px, py) {
       const G = SF.G, C = SF.C;
       if (G.result === 'win' && !G.goldDoubled && inRect(px, py, C.BTN_DOUBLE)) {
-        SF.ads.show('金币双倍', () => { G.gold += G.lastGain; G.goldDoubled = true; SF.ui.flashHint('金币双倍到账 +' + G.lastGain); });
+        SF.ads.show('金币双倍', () => { G.gold += G.lastGain; G.goldDoubled = true; SF.ui.flashHint('金币双倍到账 +' + G.lastGain); SF.save.write(true); });
         return true;
       }
       if (G.result === 'lose' && inRect(px, py, C.BTN_OVERLOAD)) {

@@ -90,6 +90,7 @@ window.SF = window.SF || {};
         G.lastGain = boss ? 30 + G.level * 5 : 10 + G.level * 2;
         G.gold += G.lastGain; G.goldDoubled = false;
         SF.ui.setHint('胜利！可看广告双倍金币，或点「' + (boss ? '进入下一星区' : '下一波') + '」');
+        SF.save.write(true);
       } else SF.ui.setHint('舰队覆灭——可看广告「旗舰超载」加成重打，或直接重试');
       SF.ui.update();
     }

@@ -10,6 +10,7 @@ window.SF = window.SF || {};
     G.phase = 'PREP';
     SF.forge.spawnCurrent();
     SF.ui.setHint(msg);
+    SF.save.write(true);   // 关键进度点：立即写档
   }
   function nextAfterWin() {
     const G = SF.G, C = SF.C, S = SF.STORY;
@@ -22,14 +23,31 @@ window.SF = window.SF || {};
   }
   function retryWave() { toPrep('备战：重整旗鼓，重新合成部署'); }
 
-  function startRun() {
+  function startRun(saved) {
     const G = SF.G, S = SF.STORY;
     SF.forge.reset();
     G.reset();
     SF.fx.clear(); SF.ads.reset();
+    if (saved) {   // 续档：恢复进度，跳过序章
+      G.level = saved.level; G.wave = saved.wave; G.gold = saved.gold;
+      G.score = saved.score; G.bestTier = saved.bestTier;
+    }
     SF.forge.spawnCurrent();
-    SF.ui.setHint(SF.ui.PREP_HINT);
-    SF.storySys.queue(S.INTRO, S.SECTORS[0]); SF.storySys.advance();
+    if (saved) {
+      SF.ui.setHint('已读取存档：星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + ' 波，继续征程');
+      SF.ui.update();
+    } else {
+      SF.ui.setHint(SF.ui.PREP_HINT);
+      SF.storySys.queue(S.INTRO, S.SECTORS[0]); SF.storySys.advance();
+      SF.save.write(true);
+    }
+  }
+  function freshRun() { SF.save.clear(); startRun(null); }   // 重新开始 = 清档从头
+  function boot() {
+    const r = SF.save.load();
+    if (r && r.tampered) { SF.save.clear(); startRun(null); SF.ui.flashHint('⚠ 存档校验失败（疑似被修改），进度已重置'); return; }
+    if (r && SF.save.hasProgress(r.data)) { startRun(r.data); return; }
+    startRun(null);
   }
 
   function onFire() {
@@ -57,10 +75,10 @@ window.SF = window.SF || {};
     requestAnimationFrame(loop);
   }
 
-  SF.main = { startRun, retryWave, nextAfterWin };
+  SF.main = { startRun, freshRun, retryWave, nextAfterWin };
 
-  SF.ui.bind(onFire, startRun);
+  SF.ui.bind(onFire, freshRun);
   SF.input.bind();
-  startRun();
+  boot();
   requestAnimationFrame(loop);
 })();

@@ -187,6 +187,78 @@ window.SF = window.SF || {};
   SF.G = G;
 })();
 
+/* save.js — 服务层：本地存档 + 防篡改校验 + 云同步接口预留。
+   ── 防篡改说明（务必阅读）──────────────────────────────
+   本地校验和（盐值在客户端）只能防“直接手改存档”的普通玩家，
+   防不了逆向拿到盐值的人。真正的防线是未来的服务器：
+   服务器用私钥对存档做 HMAC 签名并保存权威副本，客户端只验签、不持钥。
+   本模块的存档结构（版本号 v / 数据 d / 校验和 sum / 时间戳 ts）
+   即按该方案设计，接服务器时结构不变、只补 remote 实现。 */
+window.SF = window.SF || {};
+(function () {
+  'use strict';
+  const KEY = 'starforge_save_v1';
+  const SALT = 'SF-proto-2026';   // 原型盐值；正式版删除，改由服务器端 HMAC 私钥签名
+  let mem = null;                 // localStorage 不可用时的内存兜底（本次会话内有效）
+  let lastWrite = 0;
+
+  // djb2 哈希 → 十六进制校验和（轻量，防手改；非加密安全）
+  function hash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+  function store() { try { return window.localStorage; } catch (e) { return null; } }
+  function payload() {
+    const G = SF.G;
+    return { v: 1, level: G.level, wave: G.wave, gold: G.gold, score: G.score, bestTier: G.bestTier, ts: Date.now() };
+  }
+
+  SF.save = {
+    /** 写档。默认 1 秒节流；force=true 立即写（关键进度点用）。 */
+    write(force) {
+      const now = Date.now();
+      if (!force && now - lastWrite < 1000) return;
+      lastWrite = now;
+      const p = payload();
+      const rec = JSON.stringify({ d: p, sum: hash(JSON.stringify(p) + SALT) });
+      const s = store();
+      if (s) { try { s.setItem(KEY, rec); return; } catch (e) { /* 配额/隐私模式 */ } }
+      mem = rec;
+    },
+    /** 读档。返回 {data} | {tampered:true} | null（无档/版本不符/解析失败）。 */
+    load() {
+      const s = store();
+      let raw = null;
+      if (s) { try { raw = s.getItem(KEY); } catch (e) { raw = mem; } }
+      if (!raw) raw = mem;
+      if (!raw) return null;
+      try {
+        const rec = JSON.parse(raw);
+        if (hash(JSON.stringify(rec.d) + SALT) !== rec.sum) return { tampered: true };  // 校验失败 → 疑似篡改
+        if (!rec.d || rec.d.v !== 1) return null;   // 版本不符 → 未来在此做迁移
+        return { data: rec.d };
+      } catch (e) { return null; }
+    },
+    clear() { const s = store(); if (s) { try { s.removeItem(KEY); } catch (e) {} } mem = null; },
+    hasProgress(d) { return !!d && (d.level > 0 || d.wave > 0 || d.gold > 0 || d.score > 0); },
+
+    /* ── 云同步接口预留（正式版实现）─────────────────────────
+       登录流程约定：
+         1. 登录成功后 remote.pull() 拉取服务器权威存档（服务器验签自己的 HMAC）；
+         2. 本地 load()：若 tampered → 直接采用服务器档（本地视为作弊/损坏）；
+         3. 双方均有效 → 比进度（level, wave, ts 依次比较），取高者；
+            本地更新 → remote.push(rec) 上行，服务器重新签名落库；
+         4. 无网络 → 本地档先用，标记 dirty，下次联网补推。
+       抖音端替换点：localStorage → tt.setStorageSync / tt.getStorageSync；
+                     网络 → tt.request 调自建服务或抖音云。
+       占位（保持 null，接入时赋值实现）： */
+    remote: null   // { pull(): Promise<rec|null>, push(rec): Promise<ok>, verify(rec): Promise<ok> }
+  };
+
+  window.addEventListener('beforeunload', () => SF.save.write(true));
+})();
+
 /* fx.js — 服务层：粒子/光束/飘字/屏震 特效池。自持状态，供系统层调用、render 绘制。 */
 window.SF = window.SF || {};
 (function () {
@@ -544,6 +616,7 @@ window.SF = window.SF || {};
         G.lastGain = boss ? 30 + G.level * 5 : 10 + G.level * 2;
         G.gold += G.lastGain; G.goldDoubled = false;
         SF.ui.setHint('胜利！可看广告双倍金币，或点「' + (boss ? '进入下一星区' : '下一波') + '」');
+        SF.save.write(true);
       } else SF.ui.setHint('舰队覆灭——可看广告「旗舰超载」加成重打，或直接重试');
       SF.ui.update();
     }
@@ -562,12 +635,12 @@ window.SF = window.SF || {};
     G.gold -= C.REFRESH_COST;
     if (G.current) G.current.tier = SF.util.pickDropTier();
     G.nextTier = SF.util.pickDropTier();
-    SF.ui.flashHint('投放队列已刷新'); SF.ui.update();
+    SF.ui.flashHint('投放队列已刷新'); SF.ui.update(); SF.save.write();
   }
   function spendRecruit() {
     const G = SF.G, C = SF.C;
     if (G.gold < C.RECRUIT_COST) { SF.ui.flashHint('金币不足，可看广告免费招募 →'); return; }
-    G.gold -= C.RECRUIT_COST; grantRecruit();
+    G.gold -= C.RECRUIT_COST; grantRecruit(); SF.save.write();
   }
   function grantRecruit() {
     const C = SF.C;
@@ -596,7 +669,7 @@ window.SF = window.SF || {};
     tryResultClick(px, py) {
       const G = SF.G, C = SF.C;
       if (G.result === 'win' && !G.goldDoubled && inRect(px, py, C.BTN_DOUBLE)) {
-        SF.ads.show('金币双倍', () => { G.gold += G.lastGain; G.goldDoubled = true; SF.ui.flashHint('金币双倍到账 +' + G.lastGain); });
+        SF.ads.show('金币双倍', () => { G.gold += G.lastGain; G.goldDoubled = true; SF.ui.flashHint('金币双倍到账 +' + G.lastGain); SF.save.write(true); });
         return true;
       }
       if (G.result === 'lose' && inRect(px, py, C.BTN_OVERLOAD)) {
@@ -940,6 +1013,7 @@ window.SF = window.SF || {};
     G.phase = 'PREP';
     SF.forge.spawnCurrent();
     SF.ui.setHint(msg);
+    SF.save.write(true);   // 关键进度点：立即写档
   }
   function nextAfterWin() {
     const G = SF.G, C = SF.C, S = SF.STORY;
@@ -952,14 +1026,31 @@ window.SF = window.SF || {};
   }
   function retryWave() { toPrep('备战：重整旗鼓，重新合成部署'); }
 
-  function startRun() {
+  function startRun(saved) {
     const G = SF.G, S = SF.STORY;
     SF.forge.reset();
     G.reset();
     SF.fx.clear(); SF.ads.reset();
+    if (saved) {   // 续档：恢复进度，跳过序章
+      G.level = saved.level; G.wave = saved.wave; G.gold = saved.gold;
+      G.score = saved.score; G.bestTier = saved.bestTier;
+    }
     SF.forge.spawnCurrent();
-    SF.ui.setHint(SF.ui.PREP_HINT);
-    SF.storySys.queue(S.INTRO, S.SECTORS[0]); SF.storySys.advance();
+    if (saved) {
+      SF.ui.setHint('已读取存档：星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + ' 波，继续征程');
+      SF.ui.update();
+    } else {
+      SF.ui.setHint(SF.ui.PREP_HINT);
+      SF.storySys.queue(S.INTRO, S.SECTORS[0]); SF.storySys.advance();
+      SF.save.write(true);
+    }
+  }
+  function freshRun() { SF.save.clear(); startRun(null); }   // 重新开始 = 清档从头
+  function boot() {
+    const r = SF.save.load();
+    if (r && r.tampered) { SF.save.clear(); startRun(null); SF.ui.flashHint('⚠ 存档校验失败（疑似被修改），进度已重置'); return; }
+    if (r && SF.save.hasProgress(r.data)) { startRun(r.data); return; }
+    startRun(null);
   }
 
   function onFire() {
@@ -987,11 +1078,11 @@ window.SF = window.SF || {};
     requestAnimationFrame(loop);
   }
 
-  SF.main = { startRun, retryWave, nextAfterWin };
+  SF.main = { startRun, freshRun, retryWave, nextAfterWin };
 
-  SF.ui.bind(onFire, startRun);
+  SF.ui.bind(onFire, freshRun);
   SF.input.bind();
-  startRun();
+  boot();
   requestAnimationFrame(loop);
 })();
 
