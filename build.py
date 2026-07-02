@@ -5,7 +5,7 @@
 import re, io
 
 MODULES = [
-    'js/config.js', 'js/story-data.js', 'js/state.js', 'js/save.js',
+    'js/config.js', 'js/story-data.js', 'js/state.js', 'js/save.js', 'js/audio.js',
     'js/fx.js', 'js/synergy.js', 'js/fleet.js',
     'js/forge.js', 'js/board.js', 'js/battle.js',
     'js/economy.js', 'js/ads.js', 'js/story.js',

@@ -4,7 +4,7 @@ window.SF = window.SF || {};
   'use strict';
   SF.storySys = {
     queue() { for (let i = 0; i < arguments.length; i++) if (arguments[i]) SF.G.storyQueue.push(arguments[i]); },
-    advance() { SF.G.story = SF.G.storyQueue.shift() || null; SF.ui.update(); },
+    advance() { SF.G.story = SF.G.storyQueue.shift() || null; if (SF.G.story) SF.audio.play('card'); SF.ui.update(); },
     active() { return !!SF.G.story; },
     bossCard(lv) {
       const i = Math.min(lv, 4), S = SF.STORY;

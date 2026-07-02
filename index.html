@@ -23,6 +23,7 @@
   #fire:active{ background:#2a1020; }
   #reset{ border-color:#00e5ff; color:#8fe8ff; }
   #reset:active{ background:#0a1e2a; }
+  #mute{ flex:0 0 56px; border-color:#5f7797; color:#8fb4d6; font-size:18px; }
   button:disabled{ opacity:.4; cursor:not-allowed; }
   #hint{ font-size:12px; color:#6f88a8; height:14px; }
 </style>
@@ -34,6 +35,7 @@
   <div id="bar">
     <button id="fire">齐射 Boss（火力 0）</button>
     <button id="reset">重新开始</button>
+    <button id="mute" title="音效开关">🔊</button>
   </div>
   <div id="hint">移动手指/鼠标瞄准，点击投放 · 相同战舰相撞即合成升级</div>
 </div>
@@ -43,6 +45,7 @@
 <script src="js/story-data.js"></script>
 <script src="js/state.js"></script>
 <script src="js/save.js"></script>
+<script src="js/audio.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/synergy.js"></script>
 <script src="js/fleet.js"></script>

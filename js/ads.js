@@ -14,7 +14,7 @@ window.SF = window.SF || {};
     update(dt) {
       if (!adSim) return;
       adSim.t -= dt;
-      if (adSim.t <= 0) { const cb = adSim.cb; adSim = null; cb(); SF.ui.update(); }
+      if (adSim.t <= 0) { const cb = adSim.cb; adSim = null; SF.audio.play('coin'); cb(); SF.ui.update(); }
     }
   };
 })();

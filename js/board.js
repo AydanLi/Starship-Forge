@@ -27,7 +27,7 @@ window.SF = window.SF || {};
       G.slots = [null, null, null, null, null, null]; G.bench = [];
       toks.forEach((t, i) => { if (i < 6) G.slots[i] = t; else G.bench.push(t); });
       this.relayout();
-      G.phase = 'DEPLOY'; SF.ui.update();
+      G.phase = 'DEPLOY'; SF.audio.play('deploy'); SF.ui.update();
       SF.ui.setHint('拖动战舰布阵：前排扛伤/后排输出 · 相同战舰(同级同星)叠一起升星 · 好了点开战');
     },
     relayout() {
@@ -54,6 +54,7 @@ window.SF = window.SF || {};
         else if (occ.tier === tok.tier && occ.star === tok.star && occ.star < 3) {   // 升星
           occ.star++; occ.bodies = occ.bodies.concat(tok.bodies); G.slots[si] = occ;
           SF.fx.burst(C.SLOTC[si].x, C.SLOTC[si].y, C.FAC[occ.fac].c, 16); SF.fx.setShake(6);
+          SF.audio.play('star');
         } else {                                                                      // 交换
           if (from != null) G.slots[from] = occ; else G.bench.push(occ);
           G.slots[si] = tok;

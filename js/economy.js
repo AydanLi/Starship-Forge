@@ -6,22 +6,22 @@ window.SF = window.SF || {};
 
   function spendRefresh() {
     const G = SF.G, C = SF.C;
-    if (G.gold < C.REFRESH_COST) { SF.ui.flashHint('金币不足（打赢波次赚金币）'); return; }
+    if (G.gold < C.REFRESH_COST) { SF.ui.flashHint('金币不足（打赢波次赚金币）'); SF.audio.play('deny'); return; }
     G.gold -= C.REFRESH_COST;
     if (G.current) G.current.tier = SF.util.pickDropTier();
     G.nextTier = SF.util.pickDropTier();
-    SF.ui.flashHint('投放队列已刷新'); SF.ui.update(); SF.save.write();
+    SF.ui.flashHint('投放队列已刷新'); SF.audio.play('coin'); SF.ui.update(); SF.save.write();
   }
   function spendRecruit() {
     const G = SF.G, C = SF.C;
-    if (G.gold < C.RECRUIT_COST) { SF.ui.flashHint('金币不足，可看广告免费招募 →'); return; }
-    G.gold -= C.RECRUIT_COST; grantRecruit(); SF.save.write();
+    if (G.gold < C.RECRUIT_COST) { SF.ui.flashHint('金币不足，可看广告免费招募 →'); SF.audio.play('deny'); return; }
+    G.gold -= C.RECRUIT_COST; SF.audio.play('coin'); grantRecruit(); SF.save.write();
   }
   function grantRecruit() {
     const C = SF.C;
     const x = rand(C.CT.left + 60, C.CT.right - 60);
     SF.forge.addBall(C.DEPLOY_MIN, x, C.Y_DROP, 0.5);   // 空降一艘可上阵战舰（随机阵营/舰种）
-    SF.fx.burst(x, C.Y_DROP + 20, '#7cf3ff', 14); SF.fx.setShake(5);
+    SF.fx.burst(x, C.Y_DROP + 20, '#7cf3ff', 14); SF.fx.setShake(5); SF.audio.play('deploy');
     SF.ui.flashHint('援军空降！一艘攻击无人机加入熔炉'); SF.ui.update();
   }
 

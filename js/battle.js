@@ -14,7 +14,7 @@ window.SF = window.SF || {};
     const G = SF.G;
     const t = pickTarget(u); if (!t) return;
     const crit = u.team === 'p' && Math.random() < G.pBuffs.crit; let dmg = u.atk * (crit ? 1.5 : 1);
-    hit(t, dmg); addBeam(u, t, crit);
+    hit(t, dmg); addBeam(u, t, crit); SF.audio.play('shot');
     if (u.team === 'p' && G.pBuffs.splash) { const o = G.eUnits.filter(x => x.alive && x !== t); if (o.length) hit(o[(Math.random() * o.length) | 0], dmg * 0.5); }
   }
   function hit(t, dmg) {
@@ -26,7 +26,7 @@ window.SF = window.SF || {};
     SF.fx.addFloat({ x: t.x + rand(-6, 6), y: t.y - 14, t: '-' + Math.max(1, dmg), life: 0.9, color: t.team === 'e' ? '#ffe08a' : '#ff9db0', sz: 13 });
     if (t.hp <= 0) {
       if (t.team === 'p' && G.pBuffs && G.pBuffs.revive && !t.revived) { t.revived = true; t.hp = t.maxHp * 0.5; }
-      else { t.alive = false; SF.fx.burst(t.x, t.y, t.team === 'e' ? '#ff6a6a' : '#8fd8ff', 12); }
+      else { t.alive = false; SF.fx.burst(t.x, t.y, t.team === 'e' ? '#ff6a6a' : '#8fd8ff', 12); SF.audio.play(t.isBoss ? 'bossdown' : 'explode'); }
     }
   }
   function addBeam(u, t, crit) {
@@ -54,7 +54,8 @@ window.SF = window.SF || {};
       G.eUnits = SF.fleet.genEnemies(G.level, G.wave);
       SF.fleet.layout(G.pUnits, false, true); SF.fleet.layout(G.eUnits, true, false);
       G.slots = [null, null, null, null, null, null]; G.bench = [];
-      G.tacticalReady = true; G.tacticalCd = 0; G.battleTime = 0; G.phase = 'BATTLE'; SF.ui.update();
+      G.tacticalReady = true; G.tacticalCd = 0; G.battleTime = 0; G.phase = 'BATTLE';
+      SF.audio.play('battle'); SF.ui.update();
       SF.ui.setHint('自动战斗中… 羁绊已生效，必要时放「战术技」');
     },
     tactical() {
@@ -64,7 +65,7 @@ window.SF = window.SF || {};
       const each = Math.round(total * 2.4 / Math.max(1, foes.length));
       for (const f of foes) hit(f, each);
       for (let i = 0; i < 10; i++) SF.fx.addBeam({ x1: rand(C.CT.left, C.CT.right), y1: 620, x2: rand(C.CT.left, C.CT.right), y2: 200, life: 0.7, c: '#ff2e88' });
-      SF.fx.setShake(10); G.tacticalReady = false; G.tacticalCd = 8; SF.ui.update();
+      SF.fx.setShake(10); SF.audio.play('tactical'); G.tacticalReady = false; G.tacticalCd = 8; SF.ui.update();
     },
     update(dt) {
       const G = SF.G;
@@ -85,6 +86,7 @@ window.SF = window.SF || {};
       const G = SF.G, C = SF.C;
       if (G.phase !== 'BATTLE') return;
       G.result = r; G.phase = 'RESULT';
+      SF.audio.play(r === 'win' ? 'win' : 'lose');
       if (r === 'win') {
         const boss = G.wave === C.WAVES_PER_LEVEL - 1;
         G.lastGain = boss ? 30 + G.level * 5 : 10 + G.level * 2;

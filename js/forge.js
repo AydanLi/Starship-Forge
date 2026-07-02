@@ -19,6 +19,7 @@ window.SF = window.SF || {};
       Composite.remove(world, a); Composite.remove(world, b); SF.forge.addBall(nt, nx, ny, -1.5);
       G.score += C.VALUE[nt]; G.bestTier = Math.max(G.bestTier, nt);
       SF.fx.burst(nx, ny, C.TIERS[nt].c, 8 + nt);
+      SF.audio.play('merge', nt);
       if (nt >= 6) SF.fx.addShake(nt * 0.6);
     }
     if (mergeQueue.length) { mergeQueue.length = 0; SF.ui.update(); }
@@ -30,6 +31,7 @@ window.SF = window.SF || {};
       if (b.position.y - b.circleRadius < C.Y_WARN && b.speed < 1.3) b.overTime += dt; else b.overTime = 0;
       if (b.overTime > C.OVER_LIMIT) {
         G.phase = 'GAMEOVER'; G.over = true; G.current = null;
+        SF.audio.play('overload');
         SF.ui.update(); SF.ui.setHint('熔炉过载！点击「重新开始」'); return;
       }
     }
@@ -59,6 +61,7 @@ window.SF = window.SF || {};
       if (G.phase !== 'PREP' || !G.current || !G.canDrop || G.over) return;
       const r = C.TIERS[G.current.tier].r;
       this.addBall(G.current.tier, SF.util.clamp(G.current.x, C.CT.left + r + 1, C.CT.right - r - 1), C.Y_DROP, 0.5);
+      SF.audio.play('drop');
       G.current = null; G.canDrop = false;
       setTimeout(() => { if (!G.over && G.phase === 'PREP') SF.forge.spawnCurrent(); }, 420);
     },

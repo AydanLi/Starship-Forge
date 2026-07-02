@@ -23,6 +23,7 @@
   #fire:active{ background:#2a1020; }
   #reset{ border-color:#00e5ff; color:#8fe8ff; }
   #reset:active{ background:#0a1e2a; }
+  #mute{ flex:0 0 56px; border-color:#5f7797; color:#8fb4d6; font-size:18px; }
   button:disabled{ opacity:.4; cursor:not-allowed; }
   #hint{ font-size:12px; color:#6f88a8; height:14px; }
 </style>
@@ -34,6 +35,7 @@
   <div id="bar">
     <button id="fire">齐射 Boss（火力 0）</button>
     <button id="reset">重新开始</button>
+    <button id="mute" title="音效开关">🔊</button>
   </div>
   <div id="hint">移动手指/鼠标瞄准，点击投放 · 相同战舰相撞即合成升级</div>
 </div>
@@ -259,6 +261,92 @@ window.SF = window.SF || {};
   window.addEventListener('beforeunload', () => SF.save.write(true));
 })();
 
+/* audio.js — 服务层：程序化合成音效（Web Audio API，零音频文件）。
+   浏览器策略：首次用户交互后才允许出声，本模块自动在首次 pointerdown 解锁。
+   正式版可整体替换为真实音频文件（Cocos AudioSource / tt 音频接口），调用点不变。 */
+window.SF = window.SF || {};
+(function () {
+  'use strict';
+  let ctx = null, master = null, muted = false, lastShot = 0;
+  try { muted = localStorage.getItem('starforge_muted') === '1'; } catch (e) {}
+
+  function ensure() {
+    if (ctx) return true;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = 0.5; master.connect(ctx.destination);
+    return true;
+  }
+  function unlock() { if (ensure() && ctx.state === 'suspended') ctx.resume(); }
+
+  function env(g, t0, a, d, peak) {
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + a);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + a + d);
+  }
+  function beep(freq, dur, type, peak, slideTo, delay) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime + (delay || 0);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + dur);
+    env(g, t0, 0.005, dur, peak || 0.15);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function noise(dur, peak, cutoff, delay) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime + (delay || 0);
+    const n = Math.floor(ctx.sampleRate * dur), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff || 900;
+    const g = ctx.createGain(); env(g, t0, 0.005, dur, peak || 0.2);
+    src.connect(f); f.connect(g); g.connect(master); src.start(t0);
+  }
+
+  const sfx = {
+    drop() { beep(320, 0.07, 'sine', 0.10, 220); },
+    // 合成音随等级变厚重；高级合成加锯齿泛音+噪声冲击
+    merge(tier) {
+      const f = 240 + tier * 46;
+      beep(f, 0.10, 'triangle', 0.16);
+      beep(f * 1.5, 0.12, 'triangle', 0.14, null, 0.06);
+      if (tier >= 8) { beep(f * 2, 0.18, 'sawtooth', 0.10, null, 0.12); noise(0.15, 0.06, 1200, 0.05); }
+    },
+    star() { [660, 880, 1320].forEach((f, i) => beep(f, 0.12, 'triangle', 0.16, null, i * 0.07)); },
+    deploy() { beep(180, 0.22, 'sawtooth', 0.10, 420); },
+    battle() { beep(160, 0.18, 'square', 0.10); beep(160, 0.18, 'square', 0.10, null, 0.22); },
+    shot() { const now = performance.now(); if (now - lastShot < 50) return; lastShot = now; beep(900, 0.05, 'square', 0.04, 300); },   // 全局节流50ms
+    explode() { noise(0.28, 0.22, 800); beep(90, 0.25, 'sine', 0.12, 40); },
+    bossdown() { noise(0.6, 0.3, 500); beep(60, 0.5, 'sine', 0.18, 35); },
+    win() { [523, 659, 784].forEach((f, i) => beep(f, 0.14, 'triangle', 0.15, null, i * 0.09)); },
+    lose() { [392, 311, 233].forEach((f, i) => beep(f, 0.22, 'sine', 0.14, null, i * 0.16)); },
+    tactical() { beep(1400, 0.35, 'sawtooth', 0.12, 180); noise(0.3, 0.15, 2000, 0.05); },
+    coin() { beep(1320, 0.07, 'triangle', 0.16); beep(1760, 0.09, 'triangle', 0.14, null, 0.07); },
+    deny() { beep(130, 0.16, 'square', 0.10, 90); },
+    card() { beep(520, 0.08, 'sine', 0.10, 700); },
+    overload() { beep(420, 0.7, 'sawtooth', 0.16, 70); noise(0.5, 0.12, 500, 0.1); }
+  };
+
+  SF.audio = {
+    play(name, arg) { if (muted || !ctx) return; const f = sfx[name]; if (f) { try { f(arg); } catch (e) {} } },
+    unlock,
+    ready() { return ctx ? ctx.state : 'none'; },
+    get muted() { return muted; },
+    toggle() {
+      muted = !muted;
+      try { localStorage.setItem('starforge_muted', muted ? '1' : '0'); } catch (e) {}
+      const b = document.getElementById('mute'); if (b) b.textContent = muted ? '🔇' : '🔊';
+      if (!muted) unlock();
+    }
+  };
+
+  window.addEventListener('pointerdown', unlock);
+  const mb = document.getElementById('mute');
+  if (mb) { mb.textContent = muted ? '🔇' : '🔊'; mb.addEventListener('click', () => SF.audio.toggle()); }
+})();
+
 /* fx.js — 服务层：粒子/光束/飘字/屏震 特效池。自持状态，供系统层调用、render 绘制。 */
 window.SF = window.SF || {};
 (function () {
@@ -395,6 +483,7 @@ window.SF = window.SF || {};
       Composite.remove(world, a); Composite.remove(world, b); SF.forge.addBall(nt, nx, ny, -1.5);
       G.score += C.VALUE[nt]; G.bestTier = Math.max(G.bestTier, nt);
       SF.fx.burst(nx, ny, C.TIERS[nt].c, 8 + nt);
+      SF.audio.play('merge', nt);
       if (nt >= 6) SF.fx.addShake(nt * 0.6);
     }
     if (mergeQueue.length) { mergeQueue.length = 0; SF.ui.update(); }
@@ -406,6 +495,7 @@ window.SF = window.SF || {};
       if (b.position.y - b.circleRadius < C.Y_WARN && b.speed < 1.3) b.overTime += dt; else b.overTime = 0;
       if (b.overTime > C.OVER_LIMIT) {
         G.phase = 'GAMEOVER'; G.over = true; G.current = null;
+        SF.audio.play('overload');
         SF.ui.update(); SF.ui.setHint('熔炉过载！点击「重新开始」'); return;
       }
     }
@@ -435,6 +525,7 @@ window.SF = window.SF || {};
       if (G.phase !== 'PREP' || !G.current || !G.canDrop || G.over) return;
       const r = C.TIERS[G.current.tier].r;
       this.addBall(G.current.tier, SF.util.clamp(G.current.x, C.CT.left + r + 1, C.CT.right - r - 1), C.Y_DROP, 0.5);
+      SF.audio.play('drop');
       G.current = null; G.canDrop = false;
       setTimeout(() => { if (!G.over && G.phase === 'PREP') SF.forge.spawnCurrent(); }, 420);
     },
@@ -482,7 +573,7 @@ window.SF = window.SF || {};
       G.slots = [null, null, null, null, null, null]; G.bench = [];
       toks.forEach((t, i) => { if (i < 6) G.slots[i] = t; else G.bench.push(t); });
       this.relayout();
-      G.phase = 'DEPLOY'; SF.ui.update();
+      G.phase = 'DEPLOY'; SF.audio.play('deploy'); SF.ui.update();
       SF.ui.setHint('拖动战舰布阵：前排扛伤/后排输出 · 相同战舰(同级同星)叠一起升星 · 好了点开战');
     },
     relayout() {
@@ -509,6 +600,7 @@ window.SF = window.SF || {};
         else if (occ.tier === tok.tier && occ.star === tok.star && occ.star < 3) {   // 升星
           occ.star++; occ.bodies = occ.bodies.concat(tok.bodies); G.slots[si] = occ;
           SF.fx.burst(C.SLOTC[si].x, C.SLOTC[si].y, C.FAC[occ.fac].c, 16); SF.fx.setShake(6);
+          SF.audio.play('star');
         } else {                                                                      // 交换
           if (from != null) G.slots[from] = occ; else G.bench.push(occ);
           G.slots[si] = tok;
@@ -540,7 +632,7 @@ window.SF = window.SF || {};
     const G = SF.G;
     const t = pickTarget(u); if (!t) return;
     const crit = u.team === 'p' && Math.random() < G.pBuffs.crit; let dmg = u.atk * (crit ? 1.5 : 1);
-    hit(t, dmg); addBeam(u, t, crit);
+    hit(t, dmg); addBeam(u, t, crit); SF.audio.play('shot');
     if (u.team === 'p' && G.pBuffs.splash) { const o = G.eUnits.filter(x => x.alive && x !== t); if (o.length) hit(o[(Math.random() * o.length) | 0], dmg * 0.5); }
   }
   function hit(t, dmg) {
@@ -552,7 +644,7 @@ window.SF = window.SF || {};
     SF.fx.addFloat({ x: t.x + rand(-6, 6), y: t.y - 14, t: '-' + Math.max(1, dmg), life: 0.9, color: t.team === 'e' ? '#ffe08a' : '#ff9db0', sz: 13 });
     if (t.hp <= 0) {
       if (t.team === 'p' && G.pBuffs && G.pBuffs.revive && !t.revived) { t.revived = true; t.hp = t.maxHp * 0.5; }
-      else { t.alive = false; SF.fx.burst(t.x, t.y, t.team === 'e' ? '#ff6a6a' : '#8fd8ff', 12); }
+      else { t.alive = false; SF.fx.burst(t.x, t.y, t.team === 'e' ? '#ff6a6a' : '#8fd8ff', 12); SF.audio.play(t.isBoss ? 'bossdown' : 'explode'); }
     }
   }
   function addBeam(u, t, crit) {
@@ -580,7 +672,8 @@ window.SF = window.SF || {};
       G.eUnits = SF.fleet.genEnemies(G.level, G.wave);
       SF.fleet.layout(G.pUnits, false, true); SF.fleet.layout(G.eUnits, true, false);
       G.slots = [null, null, null, null, null, null]; G.bench = [];
-      G.tacticalReady = true; G.tacticalCd = 0; G.battleTime = 0; G.phase = 'BATTLE'; SF.ui.update();
+      G.tacticalReady = true; G.tacticalCd = 0; G.battleTime = 0; G.phase = 'BATTLE';
+      SF.audio.play('battle'); SF.ui.update();
       SF.ui.setHint('自动战斗中… 羁绊已生效，必要时放「战术技」');
     },
     tactical() {
@@ -590,7 +683,7 @@ window.SF = window.SF || {};
       const each = Math.round(total * 2.4 / Math.max(1, foes.length));
       for (const f of foes) hit(f, each);
       for (let i = 0; i < 10; i++) SF.fx.addBeam({ x1: rand(C.CT.left, C.CT.right), y1: 620, x2: rand(C.CT.left, C.CT.right), y2: 200, life: 0.7, c: '#ff2e88' });
-      SF.fx.setShake(10); G.tacticalReady = false; G.tacticalCd = 8; SF.ui.update();
+      SF.fx.setShake(10); SF.audio.play('tactical'); G.tacticalReady = false; G.tacticalCd = 8; SF.ui.update();
     },
     update(dt) {
       const G = SF.G;
@@ -611,6 +704,7 @@ window.SF = window.SF || {};
       const G = SF.G, C = SF.C;
       if (G.phase !== 'BATTLE') return;
       G.result = r; G.phase = 'RESULT';
+      SF.audio.play(r === 'win' ? 'win' : 'lose');
       if (r === 'win') {
         const boss = G.wave === C.WAVES_PER_LEVEL - 1;
         G.lastGain = boss ? 30 + G.level * 5 : 10 + G.level * 2;
@@ -631,22 +725,22 @@ window.SF = window.SF || {};
 
   function spendRefresh() {
     const G = SF.G, C = SF.C;
-    if (G.gold < C.REFRESH_COST) { SF.ui.flashHint('金币不足（打赢波次赚金币）'); return; }
+    if (G.gold < C.REFRESH_COST) { SF.ui.flashHint('金币不足（打赢波次赚金币）'); SF.audio.play('deny'); return; }
     G.gold -= C.REFRESH_COST;
     if (G.current) G.current.tier = SF.util.pickDropTier();
     G.nextTier = SF.util.pickDropTier();
-    SF.ui.flashHint('投放队列已刷新'); SF.ui.update(); SF.save.write();
+    SF.ui.flashHint('投放队列已刷新'); SF.audio.play('coin'); SF.ui.update(); SF.save.write();
   }
   function spendRecruit() {
     const G = SF.G, C = SF.C;
-    if (G.gold < C.RECRUIT_COST) { SF.ui.flashHint('金币不足，可看广告免费招募 →'); return; }
-    G.gold -= C.RECRUIT_COST; grantRecruit(); SF.save.write();
+    if (G.gold < C.RECRUIT_COST) { SF.ui.flashHint('金币不足，可看广告免费招募 →'); SF.audio.play('deny'); return; }
+    G.gold -= C.RECRUIT_COST; SF.audio.play('coin'); grantRecruit(); SF.save.write();
   }
   function grantRecruit() {
     const C = SF.C;
     const x = rand(C.CT.left + 60, C.CT.right - 60);
     SF.forge.addBall(C.DEPLOY_MIN, x, C.Y_DROP, 0.5);   // 空降一艘可上阵战舰（随机阵营/舰种）
-    SF.fx.burst(x, C.Y_DROP + 20, '#7cf3ff', 14); SF.fx.setShake(5);
+    SF.fx.burst(x, C.Y_DROP + 20, '#7cf3ff', 14); SF.fx.setShake(5); SF.audio.play('deploy');
     SF.ui.flashHint('援军空降！一艘攻击无人机加入熔炉'); SF.ui.update();
   }
 
@@ -697,7 +791,7 @@ window.SF = window.SF || {};
     update(dt) {
       if (!adSim) return;
       adSim.t -= dt;
-      if (adSim.t <= 0) { const cb = adSim.cb; adSim = null; cb(); SF.ui.update(); }
+      if (adSim.t <= 0) { const cb = adSim.cb; adSim = null; SF.audio.play('coin'); cb(); SF.ui.update(); }
     }
   };
 })();
@@ -708,7 +802,7 @@ window.SF = window.SF || {};
   'use strict';
   SF.storySys = {
     queue() { for (let i = 0; i < arguments.length; i++) if (arguments[i]) SF.G.storyQueue.push(arguments[i]); },
-    advance() { SF.G.story = SF.G.storyQueue.shift() || null; SF.ui.update(); },
+    advance() { SF.G.story = SF.G.storyQueue.shift() || null; if (SF.G.story) SF.audio.play('card'); SF.ui.update(); },
     active() { return !!SF.G.story; },
     bossCard(lv) {
       const i = Math.min(lv, 4), S = SF.STORY;
