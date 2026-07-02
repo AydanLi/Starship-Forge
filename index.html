@@ -38,6 +38,22 @@
   <div id="hint">移动手指/鼠标瞄准，点击投放 · 相同战舰相撞即合成升级</div>
 </div>
 <script src="lib/matter.min.js"></script>
-<script src="game.js"></script>
+<!-- 模块加载顺序 = 依赖顺序（数据层→服务层→系统层→表现/交互→装配）。新增模块需同时更新 build.py -->
+<script src="js/config.js"></script>
+<script src="js/story-data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/synergy.js"></script>
+<script src="js/fleet.js"></script>
+<script src="js/forge.js"></script>
+<script src="js/board.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/ads.js"></script>
+<script src="js/story.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/input.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

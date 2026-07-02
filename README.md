@@ -37,12 +37,39 @@
 
 ## 还没做（后续阶段）
 
-**完整经济**（利息/商店/花金币招募援军或刷新）、**广告变现点位**、**升星按“同名(同阵营同舰种)”限制**（更贴近正统自走棋）、正式美术与音效、更多阵营/舰种与更深数值、存档。GDD v2 / PRD / 数值表里都有设计，可按 MVP 优先级继续叠。
+**升星按“同名(同阵营同舰种)”限制**（更贴近正统自走棋）、利息等硬核经济、正式美术与音效、更多阵营/舰种与更深数值、存档。GDD v2 / PRD / 数值表里都有设计，可按 MVP 优先级继续叠。
 
-## 想调什么改哪里（`game.js` 顶部）
+## 代码结构（模块化）
 
-`TIERS`（半径/颜色/名字）、`VALUE`（战力）、`DROP_POOL`（投放概率）、`DEPLOY_MIN`（可上阵起始级）、`B_HP/B_ATK/B_SPD`（战斗属性）、`STAR_MUL`（升星倍率）、`FAC/CLS`（阵营舰种）、`computeSynergy()`（羁绊数值）、`genEnemies()`（敌军/Boss 强度）、`SLOTC`（阵位坐标）、`engine.gravity.y`（重力）。
+代码按「数据层→服务层→系统层→表现/交互→装配」分层拆在 `js/` 下，全局只有一个命名空间 `SF`。加载顺序 = 依赖顺序，写在 `index.html` 和 `build.py` 两处（新增模块要同时改这两处）。设计详见 `模块化设计.md`。
+
+```
+index.html            页面骨架 + 模块加载顺序
+build.py              单文件版构建脚本（python build.py）
+js/
+  config.js           全部数值配置（改平衡先来这）        SF.C / SF.util
+  story-data.js       剧情文案（改台词只改这）            SF.STORY
+  state.js            运行时状态                          SF.G
+  fx.js               粒子/光束/飘字/屏震                 SF.fx
+  synergy.js          羁绊计算（纯函数）                  SF.synergy
+  fleet.js            单位工厂/敌军生成/站位              SF.fleet
+  forge.js            熔炉物理/投放/合成/过载             SF.forge
+  board.js            编队阵位/拖拽/升星                  SF.board
+  battle.js           自动战斗/战术技/胜负                SF.battle
+  economy.js          金币消费/结算页广告入口             SF.econ
+  ads.js              广告点位（★接抖音SDK只改这个文件）  SF.ads
+  story.js            剧情队列状态机                      SF.storySys
+  render.js           全部 canvas 绘制（只读状态）        SF.render
+  ui.js               DOM 按钮/提示条                     SF.ui
+  input.js            指针事件路由                        SF.input
+  main.js             接线/流程/主循环                    SF.main
+lib/matter.min.js     物理库（已内置）
+```
+
+## 想调什么改哪里
+
+数值平衡 → `js/config.js`（TIERS/VALUE/DROP_POOL/B_HP…/STAR_MUL/费用）；羁绊效果 → `js/synergy.js`；敌军/Boss 强度 → `js/fleet.js` 的 `genEnemies()`；剧情台词 → `js/story-data.js`；广告时长与对接 → `js/ads.js`；重力手感 → `js/forge.js` 的 `engine.gravity.y`。
 
 ## 迁移到抖音小游戏
 
-抖音小游戏用 JS/TS 运行时，语言一致。落地时把 `game.js` 逻辑迁进 Cocos Creator 的 TypeScript 组件：物理 matter.js → Cocos 内置 Box2D，渲染 → Cocos 节点/精灵。合成、羁绊、升星、自动战斗、Boss 这些纯逻辑几乎可原样复用。
+抖音小游戏用 JS/TS 运行时，语言一致。落地时每个 `js/` 模块对应一个 Cocos Creator 的 TypeScript 类/服务：`synergy/fleet` 等纯逻辑可原样复用；`forge` 的 matter.js 换成 Cocos 内置 Box2D；`render/input/ui` 被 Cocos 节点与事件系统替代；`ads.js` 换成 `tt.createRewardedVideoAd` 封装。映射表见 `模块化设计.md` 第六节。

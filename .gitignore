@@ -1,6 +1,9 @@
 # 依赖
 node_modules/
 
+# 废弃代码归档（Do Not Use，本地留档不进仓库）
+DNU/
+
 # 构建产物 / Cocos Creator 生成目录（迁移到 Cocos 后会用到）
 dist/
 build/
