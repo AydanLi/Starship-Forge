@@ -1,0 +1,24 @@
+# 依赖
+node_modules/
+
+# 构建产物 / Cocos Creator 生成目录（迁移到 Cocos 后会用到）
+dist/
+build/
+library/
+temp/
+local/
+.cocos-creator/
+
+# 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志与临时
+*.log
+*.tmp

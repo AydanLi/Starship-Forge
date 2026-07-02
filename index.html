@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>星舰熔炉 · 合成原型</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; background:#060a13; color:#cfe0f2;
+    font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif; overflow:hidden; }
+  #wrap{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:8px; }
+  #title{ font-size:15px; letter-spacing:2px; color:#7cf3ff; text-shadow:0 0 8px #00e5ff66; }
+  #title b{ color:#ffd08a; }
+  #stage{ position:relative; width:min(480px,96vw);
+    aspect-ratio:480/760; border-radius:16px; overflow:hidden;
+    box-shadow:0 0 0 2px #22406b, 0 0 40px #00131f inset, 0 8px 40px #000a; }
+  canvas{ display:block; width:100%; height:100%; touch-action:none; }
+  #bar{ display:flex; gap:10px; width:min(480px,96vw); }
+  button{ flex:1; padding:12px 8px; font-size:15px; font-weight:700; cursor:pointer;
+    border-radius:12px; border:2px solid; background:#101d33; color:#cfe0f2;
+    font-family:inherit; transition:.12s; }
+  #fire{ border-color:#ff2e88; color:#ff9dc4; text-shadow:0 0 6px #ff2e8855; }
+  #fire:active{ background:#2a1020; }
+  #reset{ border-color:#00e5ff; color:#8fe8ff; }
+  #reset:active{ background:#0a1e2a; }
+  button:disabled{ opacity:.4; cursor:not-allowed; }
+  #hint{ font-size:12px; color:#6f88a8; height:14px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="title"><b>星舰熔炉</b> · 掉落合成核心原型</div>
+  <div id="stage"><canvas id="cv" width="480" height="760"></canvas></div>
+  <div id="bar">
+    <button id="fire">齐射 Boss（火力 0）</button>
+    <button id="reset">重新开始</button>
+  </div>
+  <div id="hint">移动手指/鼠标瞄准，点击投放 · 相同战舰相撞即合成升级</div>
+</div>
+<script src="lib/matter.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
