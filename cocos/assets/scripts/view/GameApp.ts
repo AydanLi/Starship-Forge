@@ -36,7 +36,6 @@ export class GameApp extends Component {
     this.root.addComponent(UITransform);
     this.node.addChild(this.root);
     this.fitScale();
-    view.on('canvas-resize', this.fitScale, this);
     this.p = new Painter(this.root);
     for (let i = 0; i < 130; i++) this.stars.push({ x: Math.random() * 480, y: Math.random() * 760, r: Math.random() * 1.6 + 0.4, a: Math.random() * 0.7 + 0.3 });
 
