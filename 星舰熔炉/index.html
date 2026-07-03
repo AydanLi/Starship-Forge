@@ -11,6 +11,11 @@
   #wrap{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:8px; }
   #title{ font-size:15px; letter-spacing:2px; color:#7cf3ff; text-shadow:0 0 8px #00e5ff66; }
   #title b{ color:#ffd08a; }
+  #uid{ display:none; position:absolute; left:50%; top:47%; transform:translate(-50%,-50%);
+    width:64%; padding:12px 16px; font-size:17px; text-align:center; letter-spacing:2px;
+    background:#0c1728; border:2px solid #00e5ff; border-radius:12px; color:#aef5ff;
+    font-family:inherit; outline:none; box-shadow:0 0 18px #00e5ff33; z-index:5; }
+  #uid::placeholder{ color:#3f5f7a; letter-spacing:1px; }
   #stage{ position:relative; width:min(480px,96vw);
     aspect-ratio:480/760; border-radius:16px; overflow:hidden;
     box-shadow:0 0 0 2px #22406b, 0 0 40px #00131f inset, 0 8px 40px #000a; }
@@ -31,7 +36,7 @@
 <body>
 <div id="wrap">
   <div id="title"><b>星舰熔炉</b> · 掉落合成核心原型</div>
-  <div id="stage"><canvas id="cv" width="480" height="760"></canvas></div>
+  <div id="stage"><canvas id="cv" width="480" height="760"></canvas><input id="uid" maxlength="12" placeholder="指挥官代号"></div>
   <div id="bar">
     <button id="fire">齐射 Boss（火力 0）</button>
     <button id="reset">重新开始</button>
@@ -44,6 +49,7 @@
 <script src="js/config.js"></script>
 <script src="js/story-data.js"></script>
 <script src="js/state.js"></script>
+<script src="js/user.js"></script>
 <script src="js/save.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/fx.js"></script>
@@ -55,6 +61,7 @@
 <script src="js/economy.js"></script>
 <script src="js/ads.js"></script>
 <script src="js/story.js"></script>
+<script src="js/menu.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/input.js"></script>

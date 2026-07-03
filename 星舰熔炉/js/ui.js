@@ -20,6 +20,10 @@ window.SF = window.SF || {};
       const G = SF.G, C = SF.C;
       if (SF.ads.active()) { fireBtn.disabled = true; fireBtn.textContent = '📺 广告播放中…'; return; }
       if (G.story) { fireBtn.disabled = false; fireBtn.textContent = '▶ ' + (G.story.btn || '继续'); setBtn(fireBtn, '#7cf3ff', '#aef5ff'); resetBtn.textContent = '重新开始'; return; }
+      if (G.phase === 'LOGIN') { fireBtn.disabled = false; fireBtn.textContent = '🚀 进入舰桥'; setBtn(fireBtn, '#7cf3ff', '#aef5ff'); resetBtn.disabled = false; resetBtn.textContent = '游客进入'; return; }
+      if (G.phase === 'MENU') { fireBtn.disabled = false; fireBtn.textContent = G.panel ? '关闭设置' : '▶ 开始游戏'; setBtn(fireBtn, '#7cf3ff', '#aef5ff'); resetBtn.disabled = false; resetBtn.textContent = '⚙ 系统设置'; return; }
+      if (G.phase === 'MAP') { fireBtn.disabled = false; fireBtn.textContent = '← 返回主界面'; setBtn(fireBtn, '#8fb4d6', '#8fb4d6'); resetBtn.disabled = true; resetBtn.textContent = '—'; return; }
+      resetBtn.disabled = false;
       if (G.phase === 'PREP') { const n = SF.forge.deployables().length; fireBtn.textContent = '编队部署（' + n + '）'; fireBtn.disabled = n === 0; setBtn(fireBtn, '#00e5ff', '#8fe8ff'); resetBtn.textContent = '重新开始'; }
       else if (G.phase === 'DEPLOY') { const m = G.slots.filter(Boolean).length; fireBtn.textContent = '⚔ 开战（' + m + '）'; fireBtn.disabled = m === 0; setBtn(fireBtn, '#ff2e88', '#ff9dc4'); resetBtn.textContent = '重新开始'; }
       else if (G.phase === 'BATTLE') { fireBtn.textContent = G.tacticalReady ? '⚡ 战术技·全体齐射' : '战术技冷却 ' + Math.ceil(G.tacticalCd) + 's'; fireBtn.disabled = !G.tacticalReady; setBtn(fireBtn, '#ff2e88', '#ff9dc4'); }
@@ -28,7 +32,7 @@ window.SF = window.SF || {};
         if (G.result === 'win') { fireBtn.textContent = (G.wave === C.WAVES_PER_LEVEL - 1 ? '进入下一星区 ▶' : '下一波 ▶'); setBtn(fireBtn, '#7cf3ff', '#aef5ff'); }
         else { fireBtn.textContent = '重试本波 ↻'; setBtn(fireBtn, '#ffb43d', '#ffd08a'); }
       }
-      else if (G.phase === 'GAMEOVER') { fireBtn.disabled = true; fireBtn.textContent = '—'; }
+      else if (G.phase === 'GAMEOVER') { fireBtn.disabled = false; fireBtn.textContent = '返回主界面'; setBtn(fireBtn, '#8fb4d6', '#8fb4d6'); resetBtn.textContent = '重新开始'; }
     }
   };
 })();

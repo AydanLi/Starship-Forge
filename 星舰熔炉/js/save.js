@@ -8,10 +8,11 @@
 window.SF = window.SF || {};
 (function () {
   'use strict';
-  const KEY = 'starforge_save_v1';
   const SALT = 'SF-proto-2026';   // 原型盐值；正式版删除，改由服务器端 HMAC 私钥签名
   let mem = null;                 // localStorage 不可用时的内存兜底（本次会话内有效）
   let lastWrite = 0;
+  // 存档按用户 ID 分 key（多账号隔离）；未登录时落在 guest（LOGIN 阶段禁写，见 write）
+  function KEY() { return 'starforge_save_v1:' + ((SF.user && SF.user.uid()) || 'guest'); }
 
   // djb2 哈希 → 十六进制校验和（轻量，防手改；非加密安全）
   function hash(str) {
@@ -22,36 +23,38 @@ window.SF = window.SF || {};
   function store() { try { return window.localStorage; } catch (e) { return null; } }
   function payload() {
     const G = SF.G;
-    return { v: 1, level: G.level, wave: G.wave, gold: G.gold, score: G.score, bestTier: G.bestTier, ts: Date.now() };
+    return { v: 1, level: G.level, wave: G.wave, gold: G.gold, score: G.score, bestTier: G.bestTier, maxLevel: G.maxLevel, ts: Date.now() };
   }
 
   SF.save = {
-    /** 写档。默认 1 秒节流；force=true 立即写（关键进度点用）。 */
+    /** 写档。默认 1 秒节流；force=true 立即写（关键进度点用）。LOGIN 阶段禁写，防止覆盖他人档。 */
     write(force) {
+      if (SF.G && (SF.G.phase === 'LOGIN')) return;
       const now = Date.now();
       if (!force && now - lastWrite < 1000) return;
       lastWrite = now;
       const p = payload();
       const rec = JSON.stringify({ d: p, sum: hash(JSON.stringify(p) + SALT) });
       const s = store();
-      if (s) { try { s.setItem(KEY, rec); return; } catch (e) { /* 配额/隐私模式 */ } }
+      if (s) { try { s.setItem(KEY(), rec); return; } catch (e) { /* 配额/隐私模式 */ } }
       mem = rec;
     },
     /** 读档。返回 {data} | {tampered:true} | null（无档/版本不符/解析失败）。 */
     load() {
       const s = store();
       let raw = null;
-      if (s) { try { raw = s.getItem(KEY); } catch (e) { raw = mem; } }
+      if (s) { try { raw = s.getItem(KEY()); } catch (e) { raw = mem; } }
       if (!raw) raw = mem;
       if (!raw) return null;
       try {
         const rec = JSON.parse(raw);
         if (hash(JSON.stringify(rec.d) + SALT) !== rec.sum) return { tampered: true };  // 校验失败 → 疑似篡改
         if (!rec.d || rec.d.v !== 1) return null;   // 版本不符 → 未来在此做迁移
+        if (rec.d.maxLevel === undefined) rec.d.maxLevel = rec.d.level;   // 旧档兼容
         return { data: rec.d };
       } catch (e) { return null; }
     },
-    clear() { const s = store(); if (s) { try { s.removeItem(KEY); } catch (e) {} } mem = null; },
+    clear() { const s = store(); if (s) { try { s.removeItem(KEY()); } catch (e) {} } mem = null; },
     hasProgress(d) { return !!d && (d.level > 0 || d.wave > 0 || d.gold > 0 || d.score > 0); },
 
     /* ── 云同步接口预留（正式版实现）─────────────────────────

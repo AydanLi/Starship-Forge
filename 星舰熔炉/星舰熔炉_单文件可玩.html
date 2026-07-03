@@ -11,6 +11,11 @@
   #wrap{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:8px; }
   #title{ font-size:15px; letter-spacing:2px; color:#7cf3ff; text-shadow:0 0 8px #00e5ff66; }
   #title b{ color:#ffd08a; }
+  #uid{ display:none; position:absolute; left:50%; top:47%; transform:translate(-50%,-50%);
+    width:64%; padding:12px 16px; font-size:17px; text-align:center; letter-spacing:2px;
+    background:#0c1728; border:2px solid #00e5ff; border-radius:12px; color:#aef5ff;
+    font-family:inherit; outline:none; box-shadow:0 0 18px #00e5ff33; z-index:5; }
+  #uid::placeholder{ color:#3f5f7a; letter-spacing:1px; }
   #stage{ position:relative; width:min(480px,96vw);
     aspect-ratio:480/760; border-radius:16px; overflow:hidden;
     box-shadow:0 0 0 2px #22406b, 0 0 40px #00131f inset, 0 8px 40px #000a; }
@@ -31,7 +36,7 @@
 <body>
 <div id="wrap">
   <div id="title"><b>星舰熔炉</b> · 掉落合成核心原型</div>
-  <div id="stage"><canvas id="cv" width="480" height="760"></canvas></div>
+  <div id="stage"><canvas id="cv" width="480" height="760"></canvas><input id="uid" maxlength="12" placeholder="指挥官代号"></div>
   <div id="bar">
     <button id="fire">齐射 Boss（火力 0）</button>
     <button id="reset">重新开始</button>
@@ -161,7 +166,8 @@ window.SF = window.SF || {};
     canDrop: false,
     over: false,
     // 进度
-    score: 0, gold: 0, level: 0, wave: 0, bestTier: 0,
+    score: 0, gold: 0, level: 0, wave: 0, bestTier: 0, maxLevel: 0,
+    panel: null,          // MENU 内浮层：null | 'settings'
     // 编队
     slots: [null, null, null, null, null, null],
     bench: [],
@@ -178,7 +184,7 @@ window.SF = window.SF || {};
   G.reset = function () {
     G.phase = 'PREP';
     G.current = null; G.canDrop = false; G.over = false;
-    G.score = 0; G.gold = 0; G.level = 0; G.wave = 0; G.bestTier = 0;
+    G.score = 0; G.gold = 0; G.level = 0; G.wave = 0; G.bestTier = 0; G.maxLevel = 0; G.panel = null;
     G.slots = [null, null, null, null, null, null]; G.bench = []; G.dragging = null;
     G.pUnits = []; G.eUnits = []; G.pBuffs = null; G.pSyn = [];
     G.tacticalCd = 0; G.tacticalReady = false; G.battleTime = 0; G.result = ''; G.bossName = '';
@@ -187,6 +193,37 @@ window.SF = window.SF || {};
     G.nextTier = SF.util.pickDropTier();
   };
   SF.G = G;
+})();
+
+/* user.js — 服务层：用户身份（指挥官代号 = 用户ID）。
+   原型：本地多账号，代号即 ID，记住上次登录；每个 ID 独立存档（见 save.js 按 uid 分 key）。
+   ★ 抖音正式版替换点：login() 换成 tt.login() → 服务端换取 openid 作为 uid，
+     代号改为抖音昵称或自定义昵称；本模块接口不变。 */
+window.SF = window.SF || {};
+(function () {
+  'use strict';
+  const KEY_LAST = 'starforge_last_uid';
+  let uid = null;
+  try { uid = localStorage.getItem(KEY_LAST) || null; } catch (e) {}
+
+  SF.user = {
+    uid() { return uid; },
+    name() { return uid; },   // 原型：代号即 ID；接抖音后 uid=openid、name=昵称
+    /** 登录。代号 2~12 字符；返回 true 成功。 */
+    login(rawName) {
+      const n = String(rawName || '').trim();
+      if (n.length < 2 || n.length > 12) return false;
+      uid = n;
+      try { localStorage.setItem(KEY_LAST, uid); } catch (e) {}
+      return true;
+    },
+    guest() {
+      uid = '游客' + ((Math.random() * 900 + 100) | 0);
+      try { localStorage.setItem(KEY_LAST, uid); } catch (e) {}
+      return uid;
+    },
+    logout() { uid = null; try { localStorage.removeItem(KEY_LAST); } catch (e) {} }
+  };
 })();
 
 /* save.js — 服务层：本地存档 + 防篡改校验 + 云同步接口预留。
@@ -199,10 +236,11 @@ window.SF = window.SF || {};
 window.SF = window.SF || {};
 (function () {
   'use strict';
-  const KEY = 'starforge_save_v1';
   const SALT = 'SF-proto-2026';   // 原型盐值；正式版删除，改由服务器端 HMAC 私钥签名
   let mem = null;                 // localStorage 不可用时的内存兜底（本次会话内有效）
   let lastWrite = 0;
+  // 存档按用户 ID 分 key（多账号隔离）；未登录时落在 guest（LOGIN 阶段禁写，见 write）
+  function KEY() { return 'starforge_save_v1:' + ((SF.user && SF.user.uid()) || 'guest'); }
 
   // djb2 哈希 → 十六进制校验和（轻量，防手改；非加密安全）
   function hash(str) {
@@ -213,36 +251,38 @@ window.SF = window.SF || {};
   function store() { try { return window.localStorage; } catch (e) { return null; } }
   function payload() {
     const G = SF.G;
-    return { v: 1, level: G.level, wave: G.wave, gold: G.gold, score: G.score, bestTier: G.bestTier, ts: Date.now() };
+    return { v: 1, level: G.level, wave: G.wave, gold: G.gold, score: G.score, bestTier: G.bestTier, maxLevel: G.maxLevel, ts: Date.now() };
   }
 
   SF.save = {
-    /** 写档。默认 1 秒节流；force=true 立即写（关键进度点用）。 */
+    /** 写档。默认 1 秒节流；force=true 立即写（关键进度点用）。LOGIN 阶段禁写，防止覆盖他人档。 */
     write(force) {
+      if (SF.G && (SF.G.phase === 'LOGIN')) return;
       const now = Date.now();
       if (!force && now - lastWrite < 1000) return;
       lastWrite = now;
       const p = payload();
       const rec = JSON.stringify({ d: p, sum: hash(JSON.stringify(p) + SALT) });
       const s = store();
-      if (s) { try { s.setItem(KEY, rec); return; } catch (e) { /* 配额/隐私模式 */ } }
+      if (s) { try { s.setItem(KEY(), rec); return; } catch (e) { /* 配额/隐私模式 */ } }
       mem = rec;
     },
     /** 读档。返回 {data} | {tampered:true} | null（无档/版本不符/解析失败）。 */
     load() {
       const s = store();
       let raw = null;
-      if (s) { try { raw = s.getItem(KEY); } catch (e) { raw = mem; } }
+      if (s) { try { raw = s.getItem(KEY()); } catch (e) { raw = mem; } }
       if (!raw) raw = mem;
       if (!raw) return null;
       try {
         const rec = JSON.parse(raw);
         if (hash(JSON.stringify(rec.d) + SALT) !== rec.sum) return { tampered: true };  // 校验失败 → 疑似篡改
         if (!rec.d || rec.d.v !== 1) return null;   // 版本不符 → 未来在此做迁移
+        if (rec.d.maxLevel === undefined) rec.d.maxLevel = rec.d.level;   // 旧档兼容
         return { data: rec.d };
       } catch (e) { return null; }
     },
-    clear() { const s = store(); if (s) { try { s.removeItem(KEY); } catch (e) {} } mem = null; },
+    clear() { const s = store(); if (s) { try { s.removeItem(KEY()); } catch (e) {} } mem = null; },
     hasProgress(d) { return !!d && (d.level > 0 || d.wave > 0 || d.gold > 0 || d.score > 0); },
 
     /* ── 云同步接口预留（正式版实现）─────────────────────────
@@ -811,6 +851,120 @@ window.SF = window.SF || {};
   };
 })();
 
+/* menu.js — 系统层：登录 / 主界面 / 星图选关 / 系统设置。
+   UI 命中区域集中定义在 SF.menu.UI（render 用同一份数据绘制，单一数据源）。 */
+window.SF = window.SF || {};
+(function () {
+  'use strict';
+  const { inRect } = SF.util;
+  const W = 480;
+
+  const UI = {
+    // 主界面三按钮
+    MBTN: {
+      start: { x: W / 2 - 130, y: 392, w: 260, h: 56 },
+      map:   { x: W / 2 - 130, y: 464, w: 260, h: 56 },
+      set:   { x: W / 2 - 130, y: 536, w: 260, h: 56 }
+    },
+    // 设置面板行
+    SET_PANEL: { x: 70, y: 240, w: 340, h: 320 },
+    SET_ROWS: {
+      sound:  { x: 90, y: 292, w: 300, h: 46 },
+      wipe:   { x: 90, y: 352, w: 300, h: 46 },
+      logout: { x: 90, y: 412, w: 300, h: 46 },
+      close:  { x: 90, y: 484, w: 300, h: 46 }
+    },
+    // 星图节点（自下而上：启航点→五星区→新伊甸）；与剧情 SECTORS 一一对应
+    NODES: [
+      { x: 132, y: 596 }, { x: 330, y: 512 }, { x: 140, y: 428 }, { x: 330, y: 344 }, { x: 240, y: 252 }
+    ],
+    EDEN: { x: 240, y: 152 },
+    NODE_R: 42
+  };
+
+  function uidInput() { return document.getElementById('uid'); }
+  function showInput(show) { const el = uidInput(); if (el) { el.style.display = show ? 'block' : 'none'; if (show) { el.value = ''; setTimeout(() => el.focus(), 50); } } }
+
+  function loadProfile() {
+    const G = SF.G;
+    const r = SF.save.load();
+    G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0;
+    if (r && r.tampered) { SF.save.clear(); SF.ui.flashHint('⚠ 存档校验失败（疑似被修改），该账号进度已重置'); return; }
+    if (r && r.data) { const d = r.data; G.level = d.level; G.wave = d.wave; G.gold = d.gold; G.score = d.score; G.bestTier = d.bestTier; G.maxLevel = d.maxLevel || d.level; }
+  }
+
+  SF.menu = {
+    UI,
+    maxUnlocked() { return Math.min(SF.G.maxLevel, 4); },
+
+    toLogin() {
+      const G = SF.G;
+      G.phase = 'LOGIN'; G.panel = null; G.story = null; G.storyQueue = [];
+      showInput(true);
+      SF.ui.setHint('输入你的指挥官代号（2~12字），或以游客身份进入');
+      SF.ui.update();
+    },
+    confirmLogin(asGuest) {
+      const el = uidInput();
+      if (asGuest) SF.user.guest();
+      else if (!SF.user.login(el ? el.value : '')) { SF.ui.flashHint('代号需 2~12 个字符'); SF.audio.play('deny'); return; }
+      showInput(false);
+      SF.audio.play('coin');
+      loadProfile();
+      this.toMenu();
+    },
+    toMenu() {
+      const G = SF.G;
+      G.phase = 'MENU'; G.panel = null; G.story = null; G.storyQueue = [];
+      showInput(false);
+      SF.ui.setHint('欢迎回舰桥，指挥官 ' + (SF.user.name() || '') + ' · 星炉号待命中');
+      SF.ui.update();
+    },
+    toMap() {
+      const G = SF.G;
+      G.phase = 'MAP'; G.panel = null;
+      SF.audio.play('card');
+      SF.ui.setHint('星图：点击已点亮的星区跳跃 · 灰色航道仍被封锁');
+      SF.ui.update();
+    },
+    selectSector(i) {
+      const G = SF.G;
+      if (i > this.maxUnlocked()) { SF.ui.flashHint('航道封锁：需先打通前一个星区'); SF.audio.play('deny'); return; }
+      G.level = i; G.wave = 0;
+      SF.audio.play('deploy');
+      SF.main.launch({ sectorCard: i });
+    },
+    openSettings() { SF.G.panel = 'settings'; SF.audio.play('card'); },
+    closeSettings() { SF.G.panel = null; },
+
+    /** 画布点击路由（LOGIN/MENU/MAP 阶段由 input.js 调进来） */
+    click(px, py) {
+      const G = SF.G;
+      if (G.phase === 'LOGIN') return;   // 登录靠 DOM 按钮
+      if (G.phase === 'MENU') {
+        if (G.panel === 'settings') {
+          const R = UI.SET_ROWS;
+          if (inRect(px, py, R.sound)) { SF.audio.toggle(); return; }
+          if (inRect(px, py, R.wipe)) { SF.save.clear(); loadProfile(); SF.ui.flashHint('本账号存档已清除'); SF.audio.play('deny'); return; }
+          if (inRect(px, py, R.logout)) { SF.save.write(true); SF.user.logout(); this.toLogin(); return; }
+          if (inRect(px, py, R.close)) { this.closeSettings(); return; }
+          return;
+        }
+        if (inRect(px, py, UI.MBTN.start)) { SF.main.startGame(); return; }
+        if (inRect(px, py, UI.MBTN.map)) { this.toMap(); return; }
+        if (inRect(px, py, UI.MBTN.set)) { this.openSettings(); return; }
+        return;
+      }
+      if (G.phase === 'MAP') {
+        for (let i = 0; i < UI.NODES.length; i++) {
+          const n = UI.NODES[i];
+          if (Math.hypot(px - n.x, py - n.y) < UI.NODE_R) { this.selectSector(i); return; }
+        }
+      }
+    }
+  };
+})();
+
 /* render.js — 表现层：全部 canvas 绘制。只读状态，绝不修改 G。
    迁移 Cocos 时整个文件被节点/预制体替代，其余模块不动。 */
 window.SF = window.SF || {};
@@ -1007,10 +1161,154 @@ window.SF = window.SF || {};
     ctx.fillStyle = '#8fd8ff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('▶ 点击「' + (s.btn || '继续') + '」', C.W / 2, py + ph - 16); ctx.textAlign = 'left';
   }
 
+  // ================= 菜单 / 登录 / 星图 =================
+  // 静态星空（一次生成，所有菜单页共用）
+  const STARS = [];
+  for (let i = 0; i < 130; i++) STARS.push({ x: Math.random() * 480, y: Math.random() * 760, r: Math.random() * 1.6 + 0.4, a: Math.random() * 0.7 + 0.3 });
+  function drawStarfield(t) {
+    const C = SF.C;
+    ctx.fillStyle = '#05070f'; ctx.fillRect(-12, -12, C.W + 24, C.H + 24);
+    for (const s of STARS) {
+      const tw = 0.55 + 0.45 * Math.sin(t / 700 + s.x * 12.9898 + s.y * 78.233);
+      ctx.globalAlpha = s.a * tw; ctx.fillStyle = '#cfe4ff';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function nebula(x, y, r, color, alpha) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = alpha; ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  function bigTitle(y) {
+    const C = SF.C;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 22;
+    ctx.fillStyle = '#aef5ff'; ctx.font = 'bold 46px sans-serif'; ctx.fillText('星 舰 熔 炉', C.W / 2, y);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#5f7797'; ctx.font = '13px sans-serif'; ctx.fillText('— 大寂灭之后 · 杀出一条回家的路 —', C.W / 2, y + 30);
+    ctx.textAlign = 'left';
+  }
+  function menuBtn(r, label, sub, color) {
+    ctx.fillStyle = '#0c1728'; ctx.strokeStyle = color; ctx.lineWidth = 2;
+    roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = color; ctx.font = 'bold 19px sans-serif'; ctx.fillText(label, r.x + r.w / 2, r.y + (sub ? 26 : 35));
+    if (sub) { ctx.fillStyle = '#5f7797'; ctx.font = '10px sans-serif'; ctx.fillText(sub, r.x + r.w / 2, r.y + 44); }
+    ctx.textAlign = 'left';
+  }
+  function drawLogin(t) {
+    const C = SF.C;
+    drawStarfield(t);
+    nebula(120, 200, 220, '#0a2a3a', 0.5); nebula(390, 620, 260, '#241030', 0.5);
+    bigTitle(200);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8fb4d6'; ctx.font = '14px sans-serif';
+    ctx.fillText('残存舰队正在等待新的指挥官', C.W / 2, 300);
+    ctx.fillStyle = '#6f88a8'; ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('▼ 输入指挥官代号（2~12字）', C.W / 2, 342);
+    // 输入框位置由 DOM #uid 覆盖（居中于 y≈370），此处画个座舱风提示框边
+    ctx.fillStyle = '#3f5f7a'; ctx.font = '11px sans-serif';
+    ctx.fillText('代号即用户ID · 每位指挥官拥有独立的征程存档', C.W / 2, 440);
+    ctx.fillText('正式版将接入抖音登录（tt.login → openid）', C.W / 2, 460);
+    ctx.textAlign = 'left';
+  }
+  function drawMenu(t) {
+    const C = SF.C, G = SF.G, U = SF.menu.UI;
+    drawStarfield(t);
+    nebula(100, 160, 200, '#0a2a3a', 0.55); nebula(400, 300, 180, '#241030', 0.5); nebula(240, 700, 260, '#0a1f2e', 0.5);
+    bigTitle(190);
+    // 指挥官信息牌
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd08a'; ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('指挥官 ' + (SF.user.name() || '—'), C.W / 2, 268);
+    ctx.fillStyle = '#6f88a8'; ctx.font = '11px sans-serif';
+    const prog = G.maxLevel >= 5 ? '已抵达新伊甸 · 无尽征战中' : ('征程进度：星区 ' + (G.maxLevel + 1) + ' / 5');
+    ctx.fillText(prog + ' · 💰' + G.gold + ' · 分数 ' + G.score, C.W / 2, 288);
+    ctx.textAlign = 'left';
+    menuBtn(U.MBTN.start, '▶ 开始游戏', G.level > 0 || G.wave > 0 ? '续档：星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + ' 波' : '从大寂灭的残骸中启航', '#7cf3ff');
+    menuBtn(U.MBTN.map, '🗺 关卡选择', '打开星图 · 选择跳跃目标', '#ffb43d');
+    menuBtn(U.MBTN.set, '⚙ 系统设置', '音效 / 存档 / 切换指挥官', '#b06bff');
+    ctx.textAlign = 'center'; ctx.fillStyle = '#31445c'; ctx.font = '10px sans-serif';
+    ctx.fillText('星舰熔炉 原型 v0.9 · 掉落合成 × 自走棋', C.W / 2, 726); ctx.textAlign = 'left';
+    if (G.panel === 'settings') drawSettings();
+  }
+  function drawSettings() {
+    const U = SF.menu.UI, P = U.SET_PANEL, R = U.SET_ROWS, C = SF.C;
+    ctx.fillStyle = 'rgba(3,6,12,0.8)'; ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillStyle = '#0a1524'; ctx.strokeStyle = '#b06bff'; ctx.lineWidth = 2;
+    roundRect(P.x, P.y, P.w, P.h, 14); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#c3a6ff'; ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('⚙ 系统设置', C.W / 2, P.y + 34);
+    const row = (r, label, color) => {
+      ctx.fillStyle = '#101d33'; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = color; ctx.font = 'bold 14px sans-serif'; ctx.fillText(label, r.x + r.w / 2, r.y + 29);
+    };
+    row(R.sound, '音效：' + (SF.audio.muted ? '已关闭 🔇' : '已开启 🔊'), '#7cf3ff');
+    row(R.wipe, '清除本账号存档', '#ffb43d');
+    row(R.logout, '切换指挥官（退出登录）', '#ff8a9c');
+    row(R.close, '关 闭', '#8fb4d6');
+    ctx.textAlign = 'left';
+  }
+  function drawMap(t) {
+    const C = SF.C, G = SF.G, U = SF.menu.UI, S = SF.STORY;
+    drawStarfield(t);
+    // 星区各自的星云色
+    const secCol = ['#00e5ff', '#5fb0ff', '#ff2e5b', '#b06bff', '#ffb43d'];
+    U.NODES.forEach((n, i) => nebula(n.x, n.y, 120, secCol[i], i <= SF.menu.maxUnlocked() ? 0.16 : 0.05));
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#7cf3ff'; ctx.font = 'bold 20px sans-serif'; ctx.fillText('✦ 归途星图 ✦', C.W / 2, 46);
+    ctx.fillStyle = '#5f7797'; ctx.font = '11px sans-serif'; ctx.fillText('从残骸带到新伊甸 · 五重封锁', C.W / 2, 66);
+    // 航路（启航点→节点…→新伊甸）
+    const path = [{ x: 240, y: 690 }].concat(U.NODES, [U.EDEN]);
+    ctx.setLineDash([6, 7]); ctx.lineWidth = 2;
+    for (let i = 0; i < path.length - 1; i++) {
+      const unlocked = i <= SF.menu.maxUnlocked();
+      ctx.strokeStyle = unlocked ? 'rgba(124,243,255,0.55)' : 'rgba(80,100,130,0.25)';
+      ctx.beginPath(); ctx.moveTo(path[i].x, path[i].y); ctx.lineTo(path[i + 1].x, path[i + 1].y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // 新伊甸（终点）
+    ctx.shadowColor = '#ffe66a'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ffe66a'; ctx.beginPath(); ctx.arc(U.EDEN.x, U.EDEN.y, 14, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffe66a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('新伊甸 · 家园', U.EDEN.x, U.EDEN.y - 24);
+    ctx.fillStyle = '#8a7a3a'; ctx.font = '10px sans-serif'; ctx.fillText(G.maxLevel >= 5 ? '封锁已破 · 晨光在望' : '被五重封锁隔绝', U.EDEN.x, U.EDEN.y + 30);
+    // 启航点
+    ctx.fillStyle = '#8fb4d6'; ctx.font = '11px sans-serif'; ctx.fillText('▲ 星炉号 · 启航点', 240, 712);
+    // 五个星区节点
+    U.NODES.forEach((n, i) => {
+      const unlocked = i <= SF.menu.maxUnlocked(), cur = i === G.level;
+      const col = unlocked ? secCol[i] : '#3a4a60';
+      ctx.fillStyle = '#0c1728'; ctx.strokeStyle = col; ctx.lineWidth = cur ? 3.5 : 2;
+      if (cur) { ctx.shadowColor = col; ctx.shadowBlur = 16; }
+      ctx.beginPath(); ctx.arc(n.x, n.y, 30, 0, 7); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.fillStyle = unlocked ? col : '#4a5a70'; ctx.font = 'bold 15px sans-serif';
+      ctx.fillText(unlocked ? (i + 1) : '🔒', n.x, n.y + 5);
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(S.SECTORS[i].tag.split(' · ')[1] || S.SECTORS[i].tag, n.x, n.y - 42);
+      ctx.font = '10px sans-serif'; ctx.fillStyle = unlocked ? '#8fb4d6' : '#3f5069';
+      ctx.fillText(unlocked ? ('BOSS：' + S.BOSS_NAMES[i]) : '航道封锁 · 信号未探明', n.x, n.y + 48);
+      if (cur) { ctx.fillStyle = '#7cf3ff'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('📍 当前位置 · 第 ' + (G.wave + 1) + '/3 波', n.x, n.y + 62); }
+    });
+    ctx.textAlign = 'left';
+  }
+
   SF.render = {
     cv, ctx,
     draw() {
       const G = SF.G, C = SF.C;
+      const t = performance.now();
+      if (G.phase === 'LOGIN' || G.phase === 'MENU' || G.phase === 'MAP') {
+        ctx.save();
+        if (G.phase === 'LOGIN') drawLogin(t);
+        else if (G.phase === 'MENU') drawMenu(t);
+        else drawMap(t);
+        ctx.restore();
+        return;
+      }
       const { sx, sy } = SF.fx.shakeOffset();
       ctx.save(); ctx.translate(sx, sy);
       ctx.fillStyle = '#070c16'; ctx.fillRect(-12, -12, C.W + 24, C.H + 24); drawGrid();
@@ -1050,6 +1348,10 @@ window.SF = window.SF || {};
       const G = SF.G, C = SF.C;
       if (SF.ads.active()) { fireBtn.disabled = true; fireBtn.textContent = '📺 广告播放中…'; return; }
       if (G.story) { fireBtn.disabled = false; fireBtn.textContent = '▶ ' + (G.story.btn || '继续'); setBtn(fireBtn, '#7cf3ff', '#aef5ff'); resetBtn.textContent = '重新开始'; return; }
+      if (G.phase === 'LOGIN') { fireBtn.disabled = false; fireBtn.textContent = '🚀 进入舰桥'; setBtn(fireBtn, '#7cf3ff', '#aef5ff'); resetBtn.disabled = false; resetBtn.textContent = '游客进入'; return; }
+      if (G.phase === 'MENU') { fireBtn.disabled = false; fireBtn.textContent = G.panel ? '关闭设置' : '▶ 开始游戏'; setBtn(fireBtn, '#7cf3ff', '#aef5ff'); resetBtn.disabled = false; resetBtn.textContent = '⚙ 系统设置'; return; }
+      if (G.phase === 'MAP') { fireBtn.disabled = false; fireBtn.textContent = '← 返回主界面'; setBtn(fireBtn, '#8fb4d6', '#8fb4d6'); resetBtn.disabled = true; resetBtn.textContent = '—'; return; }
+      resetBtn.disabled = false;
       if (G.phase === 'PREP') { const n = SF.forge.deployables().length; fireBtn.textContent = '编队部署（' + n + '）'; fireBtn.disabled = n === 0; setBtn(fireBtn, '#00e5ff', '#8fe8ff'); resetBtn.textContent = '重新开始'; }
       else if (G.phase === 'DEPLOY') { const m = G.slots.filter(Boolean).length; fireBtn.textContent = '⚔ 开战（' + m + '）'; fireBtn.disabled = m === 0; setBtn(fireBtn, '#ff2e88', '#ff9dc4'); resetBtn.textContent = '重新开始'; }
       else if (G.phase === 'BATTLE') { fireBtn.textContent = G.tacticalReady ? '⚡ 战术技·全体齐射' : '战术技冷却 ' + Math.ceil(G.tacticalCd) + 's'; fireBtn.disabled = !G.tacticalReady; setBtn(fireBtn, '#ff2e88', '#ff9dc4'); }
@@ -1058,7 +1360,7 @@ window.SF = window.SF || {};
         if (G.result === 'win') { fireBtn.textContent = (G.wave === C.WAVES_PER_LEVEL - 1 ? '进入下一星区 ▶' : '下一波 ▶'); setBtn(fireBtn, '#7cf3ff', '#aef5ff'); }
         else { fireBtn.textContent = '重试本波 ↻'; setBtn(fireBtn, '#ffb43d', '#ffd08a'); }
       }
-      else if (G.phase === 'GAMEOVER') { fireBtn.disabled = true; fireBtn.textContent = '—'; }
+      else if (G.phase === 'GAMEOVER') { fireBtn.disabled = false; fireBtn.textContent = '返回主界面'; setBtn(fireBtn, '#8fb4d6', '#8fb4d6'); resetBtn.textContent = '重新开始'; }
     }
   };
 })();
@@ -1083,6 +1385,7 @@ window.SF = window.SF || {};
         if (SF.ads.active()) return;                      // 广告播放中屏蔽输入
         if (G.story) { SF.storySys.advance(); return; }
         const px = pX(e), py = pY(e);
+        if (G.phase === 'LOGIN' || G.phase === 'MENU' || G.phase === 'MAP') { SF.menu.click(px, py); return; }
         if (G.phase === 'RESULT') { SF.econ.tryResultClick(px, py); return; }
         if (G.phase === 'PREP') {
           if (SF.econ.tryPrepClick(px, py)) return;
@@ -1112,7 +1415,7 @@ window.SF = window.SF || {};
   function nextAfterWin() {
     const G = SF.G, C = SF.C, S = SF.STORY;
     const wasBoss = G.wave === C.WAVES_PER_LEVEL - 1;
-    if (wasBoss) { G.level++; G.wave = 0; } else G.wave++;
+    if (wasBoss) { G.level++; G.wave = 0; G.maxLevel = Math.max(G.maxLevel, G.level); } else G.wave++;
     toPrep('备战：合成战舰，凑齐羁绊再「编队部署」');
     if (wasBoss) { if (G.level < S.SECTORS.length) SF.storySys.queue(S.SECTORS[G.level]); else if (G.level === S.SECTORS.length) SF.storySys.queue(S.ENDING); }
     else if (G.wave === C.WAVES_PER_LEVEL - 1) SF.storySys.queue(SF.storySys.bossCard(G.level));
@@ -1120,41 +1423,65 @@ window.SF = window.SF || {};
   }
   function retryWave() { toPrep('备战：重整旗鼓，重新合成部署'); }
 
-  function startRun(saved) {
+  /** 进入战局（保留 G 中的进度字段，重置战场）。opts: {intro} 播序章 | {sectorCard:i} 播星区卡 */
+  function launch(opts) {
     const G = SF.G, S = SF.STORY;
-    SF.forge.reset();
-    G.reset();
-    SF.fx.clear(); SF.ads.reset();
-    if (saved) {   // 续档：恢复进度，跳过序章
-      G.level = saved.level; G.wave = saved.wave; G.gold = saved.gold;
-      G.score = saved.score; G.bestTier = saved.bestTier;
-    }
+    opts = opts || {};
+    SF.forge.reset(); SF.fx.clear(); SF.ads.reset();
+    G.pUnits = []; G.eUnits = []; G.slots = [null, null, null, null, null, null]; G.bench = []; G.dragging = null;
+    G.story = null; G.storyQueue = []; G.panel = null;
+    G.lastGain = 0; G.goldDoubled = true; G.overloadBoost = false;
+    G.phase = 'PREP'; G.over = false;
+    G.nextTier = SF.util.pickDropTier();
     SF.forge.spawnCurrent();
-    if (saved) {
-      SF.ui.setHint('已读取存档：星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + ' 波，继续征程');
-      SF.ui.update();
-    } else {
-      SF.ui.setHint(SF.ui.PREP_HINT);
-      SF.storySys.queue(S.INTRO, S.SECTORS[0]); SF.storySys.advance();
-      SF.save.write(true);
-    }
+    if (opts.intro) { SF.ui.setHint(SF.ui.PREP_HINT); SF.storySys.queue(S.INTRO, S.SECTORS[0]); SF.storySys.advance(); }
+    else if (opts.sectorCard !== undefined) { SF.ui.setHint(SF.ui.PREP_HINT); SF.storySys.queue(S.SECTORS[opts.sectorCard]); SF.storySys.advance(); }
+    else { SF.ui.setHint('星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + ' 波 — ' + SF.ui.PREP_HINT); SF.ui.update(); }
+    SF.save.write(true);
   }
-  function freshRun() { SF.save.clear(); startRun(null); }   // 重新开始 = 清档从头
+  /** 主界面「开始游戏」：有进度→续档进入；无进度→播序章 */
+  function startGame() {
+    const G = SF.G;
+    if (G.level > 0 || G.wave > 0 || G.gold > 0 || G.score > 0) launch({});
+    else launch({ intro: true });
+  }
+  /** 重新开始（战局内 reset 按钮）：清空本账号进度，从序章重来 */
+  function freshRun() {
+    const G = SF.G;
+    SF.save.clear();
+    G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0;
+    launch({ intro: true });
+  }
   function boot() {
-    const r = SF.save.load();
-    if (r && r.tampered) { SF.save.clear(); startRun(null); SF.ui.flashHint('⚠ 存档校验失败（疑似被修改），进度已重置'); return; }
-    if (r && SF.save.hasProgress(r.data)) { startRun(r.data); return; }
-    startRun(null);
+    if (SF.user.uid()) {   // 记住上次登录 → 直接进主界面
+      const r = SF.save.load();
+      const G = SF.G;
+      if (r && r.tampered) { SF.save.clear(); SF.menu.toMenu(); SF.ui.flashHint('⚠ 存档校验失败（疑似被修改），进度已重置'); return; }
+      if (r && r.data) { const d = r.data; G.level = d.level; G.wave = d.wave; G.gold = d.gold; G.score = d.score; G.bestTier = d.bestTier; G.maxLevel = d.maxLevel || d.level; }
+      SF.menu.toMenu();
+    } else SF.menu.toLogin();
   }
 
   function onFire() {
     const G = SF.G;
     if (SF.ads.active()) return;
     if (G.story) { SF.storySys.advance(); return; }
-    if (G.phase === 'PREP') SF.board.enter();
+    if (G.phase === 'LOGIN') SF.menu.confirmLogin(false);
+    else if (G.phase === 'MENU') { if (G.panel) SF.menu.closeSettings(); else startGame(); }
+    else if (G.phase === 'MAP') SF.menu.toMenu();
+    else if (G.phase === 'PREP') SF.board.enter();
     else if (G.phase === 'DEPLOY') SF.battle.start();
     else if (G.phase === 'BATTLE') SF.battle.tactical();
     else if (G.phase === 'RESULT') { G.result === 'win' ? nextAfterWin() : retryWave(); }
+    else if (G.phase === 'GAMEOVER') SF.menu.toMenu();
+  }
+  function onReset() {
+    const G = SF.G;
+    if (SF.ads.active()) return;
+    if (G.phase === 'LOGIN') SF.menu.confirmLogin(true);          // 游客进入
+    else if (G.phase === 'MENU') SF.menu.openSettings();
+    else if (G.phase === 'MAP') return;
+    else freshRun();                                               // 战局内：清档重来
   }
 
   let last = performance.now();
@@ -1162,19 +1489,19 @@ window.SF = window.SF || {};
     const G = SF.G;
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     SF.ads.update(dt);
+    SF.ui.tick(dt);
     if (!G.story && !SF.ads.active()) {
       if (G.phase === 'PREP') SF.forge.update(dt);
       else if (G.phase === 'BATTLE') SF.battle.update(dt);
       SF.fx.update(dt);
-      SF.ui.tick(dt);
     }
     SF.render.draw();
     requestAnimationFrame(loop);
   }
 
-  SF.main = { startRun, freshRun, retryWave, nextAfterWin };
+  SF.main = { launch, startGame, freshRun, retryWave, nextAfterWin };
 
-  SF.ui.bind(onFire, freshRun);
+  SF.ui.bind(onFire, onReset);
   SF.input.bind();
   boot();
   requestAnimationFrame(loop);

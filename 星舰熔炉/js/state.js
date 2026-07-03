@@ -10,7 +10,8 @@ window.SF = window.SF || {};
     canDrop: false,
     over: false,
     // 进度
-    score: 0, gold: 0, level: 0, wave: 0, bestTier: 0,
+    score: 0, gold: 0, level: 0, wave: 0, bestTier: 0, maxLevel: 0,
+    panel: null,          // MENU 内浮层：null | 'settings'
     // 编队
     slots: [null, null, null, null, null, null],
     bench: [],
@@ -27,7 +28,7 @@ window.SF = window.SF || {};
   G.reset = function () {
     G.phase = 'PREP';
     G.current = null; G.canDrop = false; G.over = false;
-    G.score = 0; G.gold = 0; G.level = 0; G.wave = 0; G.bestTier = 0;
+    G.score = 0; G.gold = 0; G.level = 0; G.wave = 0; G.bestTier = 0; G.maxLevel = 0; G.panel = null;
     G.slots = [null, null, null, null, null, null]; G.bench = []; G.dragging = null;
     G.pUnits = []; G.eUnits = []; G.pBuffs = null; G.pSyn = [];
     G.tacticalCd = 0; G.tacticalReady = false; G.battleTime = 0; G.result = ''; G.bossName = '';

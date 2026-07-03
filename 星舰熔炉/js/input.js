@@ -18,6 +18,7 @@ window.SF = window.SF || {};
         if (SF.ads.active()) return;                      // 广告播放中屏蔽输入
         if (G.story) { SF.storySys.advance(); return; }
         const px = pX(e), py = pY(e);
+        if (G.phase === 'LOGIN' || G.phase === 'MENU' || G.phase === 'MAP') { SF.menu.click(px, py); return; }
         if (G.phase === 'RESULT') { SF.econ.tryResultClick(px, py); return; }
         if (G.phase === 'PREP') {
           if (SF.econ.tryPrepClick(px, py)) return;

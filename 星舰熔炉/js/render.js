@@ -194,10 +194,154 @@ window.SF = window.SF || {};
     ctx.fillStyle = '#8fd8ff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('▶ 点击「' + (s.btn || '继续') + '」', C.W / 2, py + ph - 16); ctx.textAlign = 'left';
   }
 
+  // ================= 菜单 / 登录 / 星图 =================
+  // 静态星空（一次生成，所有菜单页共用）
+  const STARS = [];
+  for (let i = 0; i < 130; i++) STARS.push({ x: Math.random() * 480, y: Math.random() * 760, r: Math.random() * 1.6 + 0.4, a: Math.random() * 0.7 + 0.3 });
+  function drawStarfield(t) {
+    const C = SF.C;
+    ctx.fillStyle = '#05070f'; ctx.fillRect(-12, -12, C.W + 24, C.H + 24);
+    for (const s of STARS) {
+      const tw = 0.55 + 0.45 * Math.sin(t / 700 + s.x * 12.9898 + s.y * 78.233);
+      ctx.globalAlpha = s.a * tw; ctx.fillStyle = '#cfe4ff';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function nebula(x, y, r, color, alpha) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = alpha; ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  }
+  function bigTitle(y) {
+    const C = SF.C;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 22;
+    ctx.fillStyle = '#aef5ff'; ctx.font = 'bold 46px sans-serif'; ctx.fillText('星 舰 熔 炉', C.W / 2, y);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#5f7797'; ctx.font = '13px sans-serif'; ctx.fillText('— 大寂灭之后 · 杀出一条回家的路 —', C.W / 2, y + 30);
+    ctx.textAlign = 'left';
+  }
+  function menuBtn(r, label, sub, color) {
+    ctx.fillStyle = '#0c1728'; ctx.strokeStyle = color; ctx.lineWidth = 2;
+    roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = color; ctx.font = 'bold 19px sans-serif'; ctx.fillText(label, r.x + r.w / 2, r.y + (sub ? 26 : 35));
+    if (sub) { ctx.fillStyle = '#5f7797'; ctx.font = '10px sans-serif'; ctx.fillText(sub, r.x + r.w / 2, r.y + 44); }
+    ctx.textAlign = 'left';
+  }
+  function drawLogin(t) {
+    const C = SF.C;
+    drawStarfield(t);
+    nebula(120, 200, 220, '#0a2a3a', 0.5); nebula(390, 620, 260, '#241030', 0.5);
+    bigTitle(200);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8fb4d6'; ctx.font = '14px sans-serif';
+    ctx.fillText('残存舰队正在等待新的指挥官', C.W / 2, 300);
+    ctx.fillStyle = '#6f88a8'; ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('▼ 输入指挥官代号（2~12字）', C.W / 2, 342);
+    // 输入框位置由 DOM #uid 覆盖（居中于 y≈370），此处画个座舱风提示框边
+    ctx.fillStyle = '#3f5f7a'; ctx.font = '11px sans-serif';
+    ctx.fillText('代号即用户ID · 每位指挥官拥有独立的征程存档', C.W / 2, 440);
+    ctx.fillText('正式版将接入抖音登录（tt.login → openid）', C.W / 2, 460);
+    ctx.textAlign = 'left';
+  }
+  function drawMenu(t) {
+    const C = SF.C, G = SF.G, U = SF.menu.UI;
+    drawStarfield(t);
+    nebula(100, 160, 200, '#0a2a3a', 0.55); nebula(400, 300, 180, '#241030', 0.5); nebula(240, 700, 260, '#0a1f2e', 0.5);
+    bigTitle(190);
+    // 指挥官信息牌
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd08a'; ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('指挥官 ' + (SF.user.name() || '—'), C.W / 2, 268);
+    ctx.fillStyle = '#6f88a8'; ctx.font = '11px sans-serif';
+    const prog = G.maxLevel >= 5 ? '已抵达新伊甸 · 无尽征战中' : ('征程进度：星区 ' + (G.maxLevel + 1) + ' / 5');
+    ctx.fillText(prog + ' · 💰' + G.gold + ' · 分数 ' + G.score, C.W / 2, 288);
+    ctx.textAlign = 'left';
+    menuBtn(U.MBTN.start, '▶ 开始游戏', G.level > 0 || G.wave > 0 ? '续档：星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + ' 波' : '从大寂灭的残骸中启航', '#7cf3ff');
+    menuBtn(U.MBTN.map, '🗺 关卡选择', '打开星图 · 选择跳跃目标', '#ffb43d');
+    menuBtn(U.MBTN.set, '⚙ 系统设置', '音效 / 存档 / 切换指挥官', '#b06bff');
+    ctx.textAlign = 'center'; ctx.fillStyle = '#31445c'; ctx.font = '10px sans-serif';
+    ctx.fillText('星舰熔炉 原型 v0.9 · 掉落合成 × 自走棋', C.W / 2, 726); ctx.textAlign = 'left';
+    if (G.panel === 'settings') drawSettings();
+  }
+  function drawSettings() {
+    const U = SF.menu.UI, P = U.SET_PANEL, R = U.SET_ROWS, C = SF.C;
+    ctx.fillStyle = 'rgba(3,6,12,0.8)'; ctx.fillRect(0, 0, C.W, C.H);
+    ctx.fillStyle = '#0a1524'; ctx.strokeStyle = '#b06bff'; ctx.lineWidth = 2;
+    roundRect(P.x, P.y, P.w, P.h, 14); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#c3a6ff'; ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('⚙ 系统设置', C.W / 2, P.y + 34);
+    const row = (r, label, color) => {
+      ctx.fillStyle = '#101d33'; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = color; ctx.font = 'bold 14px sans-serif'; ctx.fillText(label, r.x + r.w / 2, r.y + 29);
+    };
+    row(R.sound, '音效：' + (SF.audio.muted ? '已关闭 🔇' : '已开启 🔊'), '#7cf3ff');
+    row(R.wipe, '清除本账号存档', '#ffb43d');
+    row(R.logout, '切换指挥官（退出登录）', '#ff8a9c');
+    row(R.close, '关 闭', '#8fb4d6');
+    ctx.textAlign = 'left';
+  }
+  function drawMap(t) {
+    const C = SF.C, G = SF.G, U = SF.menu.UI, S = SF.STORY;
+    drawStarfield(t);
+    // 星区各自的星云色
+    const secCol = ['#00e5ff', '#5fb0ff', '#ff2e5b', '#b06bff', '#ffb43d'];
+    U.NODES.forEach((n, i) => nebula(n.x, n.y, 120, secCol[i], i <= SF.menu.maxUnlocked() ? 0.16 : 0.05));
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#7cf3ff'; ctx.font = 'bold 20px sans-serif'; ctx.fillText('✦ 归途星图 ✦', C.W / 2, 46);
+    ctx.fillStyle = '#5f7797'; ctx.font = '11px sans-serif'; ctx.fillText('从残骸带到新伊甸 · 五重封锁', C.W / 2, 66);
+    // 航路（启航点→节点…→新伊甸）
+    const path = [{ x: 240, y: 690 }].concat(U.NODES, [U.EDEN]);
+    ctx.setLineDash([6, 7]); ctx.lineWidth = 2;
+    for (let i = 0; i < path.length - 1; i++) {
+      const unlocked = i <= SF.menu.maxUnlocked();
+      ctx.strokeStyle = unlocked ? 'rgba(124,243,255,0.55)' : 'rgba(80,100,130,0.25)';
+      ctx.beginPath(); ctx.moveTo(path[i].x, path[i].y); ctx.lineTo(path[i + 1].x, path[i + 1].y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    // 新伊甸（终点）
+    ctx.shadowColor = '#ffe66a'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#ffe66a'; ctx.beginPath(); ctx.arc(U.EDEN.x, U.EDEN.y, 14, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffe66a'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('新伊甸 · 家园', U.EDEN.x, U.EDEN.y - 24);
+    ctx.fillStyle = '#8a7a3a'; ctx.font = '10px sans-serif'; ctx.fillText(G.maxLevel >= 5 ? '封锁已破 · 晨光在望' : '被五重封锁隔绝', U.EDEN.x, U.EDEN.y + 30);
+    // 启航点
+    ctx.fillStyle = '#8fb4d6'; ctx.font = '11px sans-serif'; ctx.fillText('▲ 星炉号 · 启航点', 240, 712);
+    // 五个星区节点
+    U.NODES.forEach((n, i) => {
+      const unlocked = i <= SF.menu.maxUnlocked(), cur = i === G.level;
+      const col = unlocked ? secCol[i] : '#3a4a60';
+      ctx.fillStyle = '#0c1728'; ctx.strokeStyle = col; ctx.lineWidth = cur ? 3.5 : 2;
+      if (cur) { ctx.shadowColor = col; ctx.shadowBlur = 16; }
+      ctx.beginPath(); ctx.arc(n.x, n.y, 30, 0, 7); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.fillStyle = unlocked ? col : '#4a5a70'; ctx.font = 'bold 15px sans-serif';
+      ctx.fillText(unlocked ? (i + 1) : '🔒', n.x, n.y + 5);
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(S.SECTORS[i].tag.split(' · ')[1] || S.SECTORS[i].tag, n.x, n.y - 42);
+      ctx.font = '10px sans-serif'; ctx.fillStyle = unlocked ? '#8fb4d6' : '#3f5069';
+      ctx.fillText(unlocked ? ('BOSS：' + S.BOSS_NAMES[i]) : '航道封锁 · 信号未探明', n.x, n.y + 48);
+      if (cur) { ctx.fillStyle = '#7cf3ff'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('📍 当前位置 · 第 ' + (G.wave + 1) + '/3 波', n.x, n.y + 62); }
+    });
+    ctx.textAlign = 'left';
+  }
+
   SF.render = {
     cv, ctx,
     draw() {
       const G = SF.G, C = SF.C;
+      const t = performance.now();
+      if (G.phase === 'LOGIN' || G.phase === 'MENU' || G.phase === 'MAP') {
+        ctx.save();
+        if (G.phase === 'LOGIN') drawLogin(t);
+        else if (G.phase === 'MENU') drawMenu(t);
+        else drawMap(t);
+        ctx.restore();
+        return;
+      }
       const { sx, sy } = SF.fx.shakeOffset();
       ctx.save(); ctx.translate(sx, sy);
       ctx.fillStyle = '#070c16'; ctx.fillRect(-12, -12, C.W + 24, C.H + 24); drawGrid();
