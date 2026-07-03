@@ -30,21 +30,29 @@ export class GameApp extends Component {
   private p!: Painter;
   private scale = 1;
   private stars: { x: number, y: number, r: number, a: number }[] = [];
+  private _err = false;
 
   onLoad(): void {
-    this.root = new Node('GameRoot');
-    this.root.addComponent(UITransform);
-    this.node.addChild(this.root);
-    this.fitScale();
-    this.p = new Painter(this.root);
-    for (let i = 0; i < 130; i++) this.stars.push({ x: Math.random() * 480, y: Math.random() * 760, r: Math.random() * 1.6 + 0.4, a: Math.random() * 0.7 + 0.3 });
+    try {
+      console.log('[GameApp] onLoad start');
+      this.root = new Node('GameRoot');
+      this.root.addComponent(UITransform);
+      this.node.addChild(this.root);
+      this.fitScale();
+      this.p = new Painter(this.root);
+      console.log('[GameApp] painter ready, scale=', this.scale);
+      for (let i = 0; i < 130; i++) this.stars.push({ x: Math.random() * 480, y: Math.random() * 760, r: Math.random() * 1.6 + 0.4, a: Math.random() * 0.7 + 0.3 });
 
-    this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
-    this.node.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
-    this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
-    this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
+      this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
+      this.node.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
+      this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
+      this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
 
-    flow.boot();
+      flow.boot();
+      console.log('[GameApp] boot done, phase=', G.phase);
+    } catch (e: any) {
+      console.error('[GameApp] onLoad ERROR:', e && e.stack ? e.stack : e);
+    }
   }
 
   private fitScale(): void {
@@ -77,8 +85,12 @@ export class GameApp extends Component {
   private onTouchCancel(): void { flow.pointerCancel(); }
 
   update(dt: number): void {
-    flow.step(Math.min(0.05, dt));
-    this.render();
+    try {
+      flow.step(Math.min(0.05, dt));
+      this.render();
+    } catch (e: any) {
+      if (!this._err) { this._err = true; console.error('[GameApp] render ERROR:', e && e.stack ? e.stack : e); }
+    }
   }
 
   // ================= 渲染（对应 web render.js） =================
