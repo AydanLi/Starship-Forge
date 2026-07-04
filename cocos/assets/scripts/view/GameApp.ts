@@ -3,6 +3,7 @@
    逻辑零重复：所有玩法状态来自 core/ 模块。 */
 import { _decorator, Component, Node, UITransform, view, EventTouch, Layers } from 'cc';
 import { Painter, DESIGN_W, DESIGN_H } from './Painter';
+import { TEX, loadTex, tierKey } from './Tex';
 import { C, clamp } from '../core/config';
 import { G } from '../core/state';
 import { STORY } from '../core/storyData';
@@ -49,6 +50,7 @@ export class GameApp extends Component {
       this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
       this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
 
+      loadTex();
       flow.boot();
       console.log('[GameApp] boot done, phase=', G.phase);
     } catch (e: any) {
@@ -106,8 +108,13 @@ export class GameApp extends Component {
       else if (G.phase === 'MENU') this.drawMenu();
       else this.drawMap();
     } else {
-      p.fillRect(-12, -12, C.W + 24, C.H + 24, '#070c16');
-      this.drawGrid();
+      if (TEX['bg_battle_debris']) {
+        p.bgImg(TEX['bg_battle_debris'], 0, 0, 480, 840);
+        p.fillRect(-12, -12, C.W + 24, C.H + 24, 'rgba(4,8,16,0.42)');   // 压暗保证可读性
+      } else {
+        p.fillRect(-12, -12, C.W + 24, C.H + 24, '#070c16');
+        this.drawGrid();
+      }
       if (G.phase === 'PREP' || G.phase === 'GAMEOVER') this.drawForge();
       else if (G.phase === 'DEPLOY') this.drawDeploy();
       else this.drawArena();
@@ -190,6 +197,21 @@ export class GameApp extends Component {
   private drawBall(x: number, y: number, tier: number, fac?: number, cls?: number): void {
     const p = this.p, t = C.TIERS[tier], r = t.r;
     const tagged = fac !== undefined && tier >= C.DEPLOY_MIN;
+    const sf = TEX[tierKey(tier)];
+    if (sf) {
+      // 真实美术：战舰图标 + 阵营色外环
+      if (tagged) p.circle(x, y, r + 1, undefined, C.FAC[fac!].c, 3);
+      else p.circle(x, y, r, undefined, 'rgba(140,190,230,0.35)', 1.2);
+      const s = r * 2.3;
+      p.img(sf, x, y, s, s);
+      if (r >= 22) {
+        p.text(t.name, x, y + r - 2, 10, '#bfe8ff', 'center', true);
+        if (tagged && cls !== undefined) p.text(C.FAC[fac!].name + '·' + C.CLS[cls].name, x, y - r + 4, 9, C.FAC[fac!].c, 'center', true);
+      } else {
+        p.text(String(tier + 1), x + r * 0.62, y + r * 0.62, 9, '#9fd0ee', 'center', true);
+      }
+      return;
+    }
     p.circle(x, y, r, t.c);
     p.circle(x - r * 0.3, y - r * 0.3, r * 0.25, '#ffffff', undefined, 1, 0.85);   // 高光点替代径向渐变
     if (tagged) p.circle(x, y, r - 1, undefined, C.FAC[fac!].c, 3.5);
@@ -225,11 +247,19 @@ export class GameApp extends Component {
   }
   private drawToken(tok: any): void {
     const p = this.p, t = C.TIERS[tok.tier], r = 32;
-    p.circle(tok.x, tok.y, r, t.c);
-    p.circle(tok.x - r * 0.3, tok.y - r * 0.3, r * 0.22, '#ffffff', undefined, 1, 0.85);
-    p.circle(tok.x, tok.y, r - 1, undefined, C.FAC[tok.fac].c, 3.5);
-    p.text(t.name, tok.x, tok.y - 2, 10, '#08131f', 'center', true);
-    p.text(C.FAC[tok.fac].name + '·' + C.CLS[tok.cls].name, tok.x, tok.y + 9, 8, '#08131f', 'center');
+    const sf = TEX[tierKey(tok.tier)];
+    if (sf) {
+      p.circle(tok.x, tok.y, r + 1, undefined, C.FAC[tok.fac].c, 3);
+      p.img(sf, tok.x, tok.y, r * 2.3, r * 2.3);
+      p.text(t.name, tok.x, tok.y + r - 1, 10, '#bfe8ff', 'center', true);
+      p.text(C.FAC[tok.fac].name + '·' + C.CLS[tok.cls].name, tok.x, tok.y - r + 4, 8, C.FAC[tok.fac].c, 'center', true);
+    } else {
+      p.circle(tok.x, tok.y, r, t.c);
+      p.circle(tok.x - r * 0.3, tok.y - r * 0.3, r * 0.22, '#ffffff', undefined, 1, 0.85);
+      p.circle(tok.x, tok.y, r - 1, undefined, C.FAC[tok.fac].c, 3.5);
+      p.text(t.name, tok.x, tok.y - 2, 10, '#08131f', 'center', true);
+      p.text(C.FAC[tok.fac].name + '·' + C.CLS[tok.cls].name, tok.x, tok.y + 9, 8, '#08131f', 'center');
+    }
     if (tok.star > 1) p.text('★'.repeat(tok.star), tok.x, tok.y - r - 3, 12, '#ffd54a', 'center', true);
   }
 
@@ -246,8 +276,15 @@ export class GameApp extends Component {
     const p = this.p;
     const enemy = u.team === 'e', r = u.isBoss ? 40 : (u.summon ? 14 : 16 + u.tier * 1.6);
     const col = enemy ? (u.isBoss ? '#ff3b5c' : '#ff6a6a') : C.FAC[u.fac].c;
-    if (enemy) {
+    const bossSf = TEX['boss_vulture'];
+    const shipSf = (!enemy && !u.summon) ? TEX[tierKey(u.tier)] : (!enemy && u.summon ? TEX[tierKey(4)] : undefined);
+    if (enemy && u.isBoss && bossSf) {
+      p.img(bossSf, u.x, u.y, r * 2.4, r * 2.4);
+    } else if (enemy) {
       p.poly([{ x: u.x, y: u.y + r }, { x: u.x + r, y: u.y - r * 0.7 }, { x: u.x - r, y: u.y - r * 0.7 }], col, '#ffffffbb', 1.5);
+    } else if (shipSf) {
+      p.circle(u.x, u.y, r + 1, undefined, col, 2.5);
+      p.img(shipSf, u.x, u.y, r * 2.3, r * 2.3);
     } else {
       p.circle(u.x, u.y, r, col, '#ffffffbb', 1.5);
       p.circle(u.x - r * 0.3, u.y - r * 0.3, r * 0.22, '#ffffff', undefined, 1, 0.8);
@@ -353,10 +390,18 @@ export class GameApp extends Component {
     p.text(label, r.x + r.w / 2, r.y + (sub ? 26 : 35), 19, color, 'center', true);
     if (sub) p.text(sub, r.x + r.w / 2, r.y + 44, 10, '#5f7797', 'center');
   }
+  private menuBg(key: string): boolean {
+    if (!TEX[key]) return false;
+    this.p.bgImg(TEX[key], 0, 0, 480, 840);
+    this.p.fillRect(-12, -12, C.W + 24, C.H + 24, 'rgba(3,6,12,0.34)');   // 压暗提升文字对比
+    return true;
+  }
   private drawLogin(): void {
     const p = this.p;
-    this.drawStarfield();
-    this.nebula(120, 200, 220, '#0a2a3a', 0.5); this.nebula(390, 620, 260, '#241030', 0.5);
+    if (!this.menuBg('bg_menu_flagship')) {
+      this.drawStarfield();
+      this.nebula(120, 200, 220, '#0a2a3a', 0.5); this.nebula(390, 620, 260, '#241030', 0.5);
+    }
     this.bigTitle(200);
     p.text('残存舰队正在等待新的指挥官', C.W / 2, 300, 14, '#8fb4d6', 'center');
     p.text('▼ 点击下方输入指挥官代号（2~12字）', C.W / 2, 336, 13, '#6f88a8', 'center', true);
@@ -369,8 +414,10 @@ export class GameApp extends Component {
   }
   private drawMenu(): void {
     const p = this.p;
-    this.drawStarfield();
-    this.nebula(100, 160, 200, '#0a2a3a', 0.55); this.nebula(400, 300, 180, '#241030', 0.5); this.nebula(240, 700, 260, '#0a1f2e', 0.5);
+    if (!this.menuBg('bg_menu_flagship')) {
+      this.drawStarfield();
+      this.nebula(100, 160, 200, '#0a2a3a', 0.55); this.nebula(400, 300, 180, '#241030', 0.5); this.nebula(240, 700, 260, '#0a1f2e', 0.5);
+    }
     this.bigTitle(190);
     p.text('指挥官 ' + (user.name() || '—'), C.W / 2, 268, 14, '#ffd08a', 'center', true);
     const prog = G.maxLevel >= 5 ? '已抵达新伊甸 · 无尽征战中' : ('征程进度：星区 ' + (G.maxLevel + 1) + ' / 5');
@@ -399,8 +446,8 @@ export class GameApp extends Component {
   }
   private drawMap(): void {
     const p = this.p;
-    this.drawStarfield();
     const secCol = ['#00e5ff', '#5fb0ff', '#ff2e5b', '#b06bff', '#ffb43d'];
+    if (!this.menuBg('bg_starmap')) this.drawStarfield();
     MENU_UI.NODES.forEach((n, i) => this.nebula(n.x, n.y, 120, secCol[i], i <= menu.maxUnlocked() ? 0.16 : 0.05));
     p.text('✦ 归途星图 ✦', C.W / 2, 46, 20, '#7cf3ff', 'center', true);
     p.text('从残骸带到新伊甸 · 五重封锁', C.W / 2, 66, 11, '#5f7797', 'center');

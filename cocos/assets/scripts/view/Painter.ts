@@ -1,7 +1,7 @@
 /* Painter.ts — 视图层画笔：Graphics(矢量) + Label池(文字)，
    提供与 canvas 2D 同形的接口，游戏坐标系与 web 原型一致（左上原点 480x840，含底部按钮条）。
    两个图层：0=场景，1=覆盖层（结算/剧情/广告/设置面板），保证遮罩能盖住场景文字。 */
-import { Node, Graphics, Label, Color, UITransform, Layers } from 'cc';
+import { Node, Graphics, Label, Color, UITransform, Layers, Sprite, SpriteFrame } from 'cc';
 
 export const DESIGN_W = 480;
 export const DESIGN_H = 840;   // 760 游戏区 + 80 底部按钮条
@@ -24,15 +24,29 @@ function parseColor(s: string, alpha: number): Color {
 
 class Layer {
   gfx: Graphics;
+  bgRoot: Node;   // 背景图池：矢量之下
+  sprRoot: Node;  // 精灵池：矢量之上、文字之下
   labelRoot: Node;
   labels: Label[] = [];
   used = 0;
+  bgs: Sprite[] = [];
+  bgUsed = 0;
+  sprites: Sprite[] = [];
+  sprUsed = 0;
   constructor(parent: Node, name: string) {
+    this.bgRoot = new Node(name + '_bgs');
+    this.bgRoot.layer = Layers.Enum.UI_2D;
+    this.bgRoot.addComponent(UITransform);
+    parent.addChild(this.bgRoot);
     const gn = new Node(name + '_gfx');
     gn.layer = Layers.Enum.UI_2D;
     gn.addComponent(UITransform);
     this.gfx = gn.addComponent(Graphics);
     parent.addChild(gn);
+    this.sprRoot = new Node(name + '_sprites');
+    this.sprRoot.layer = Layers.Enum.UI_2D;
+    this.sprRoot.addComponent(UITransform);
+    parent.addChild(this.sprRoot);
     this.labelRoot = new Node(name + '_labels');
     this.labelRoot.layer = Layers.Enum.UI_2D;
     this.labelRoot.addComponent(UITransform);
@@ -49,8 +63,25 @@ class Layer {
     this.labels.push(l); this.used++;
     return l;
   }
-  begin(): void { this.gfx.clear(); this.used = 0; }
-  end(): void { for (let i = this.used; i < this.labels.length; i++) this.labels[i].node.active = false; }
+  private spriteFrom(pool: Sprite[], root: Node, used: number): Sprite {
+    if (used < pool.length) { const s = pool[used]; s.node.active = true; return s; }
+    const n = new Node('sp' + pool.length);
+    n.layer = Layers.Enum.UI_2D;
+    n.addComponent(UITransform);
+    const s = n.addComponent(Sprite);
+    s.sizeMode = Sprite.SizeMode.CUSTOM;
+    root.addChild(n);
+    pool.push(s);
+    return s;
+  }
+  sprite(): Sprite { const s = this.spriteFrom(this.sprites, this.sprRoot, this.sprUsed); this.sprUsed++; return s; }
+  bgSprite(): Sprite { const s = this.spriteFrom(this.bgs, this.bgRoot, this.bgUsed); this.bgUsed++; return s; }
+  begin(): void { this.gfx.clear(); this.used = 0; this.sprUsed = 0; this.bgUsed = 0; }
+  end(): void {
+    for (let i = this.used; i < this.labels.length; i++) this.labels[i].node.active = false;
+    for (let i = this.sprUsed; i < this.sprites.length; i++) this.sprites[i].node.active = false;
+    for (let i = this.bgUsed; i < this.bgs.length; i++) this.bgs[i].node.active = false;
+  }
 }
 
 export class Painter {
@@ -127,6 +158,22 @@ export class Painter {
     ut.setAnchorPoint(align === 'left' ? 0 : (align === 'right' ? 1 : 0.5), 0.5);
     // canvas 的 y 是文字基线，近似换算为中心
     l.node.setPosition(this.tx(x), this.ty(y - size * 0.35), 0);
+  }
+  /** 精灵图（中心坐标）：在矢量之上、文字之下 */
+  img(sf: SpriteFrame, cx: number, cy: number, w: number, h: number, alpha = 1): void {
+    const s = this.cur.sprite();
+    if (s.spriteFrame !== sf) s.spriteFrame = sf;
+    s.color = new Color(255, 255, 255, Math.round(255 * alpha));
+    s.node.getComponent(UITransform)!.setContentSize(w, h);
+    s.node.setPosition(this.tx(cx), this.ty(cy), 0);
+  }
+  /** 背景图（左上角坐标）：垫在本层所有矢量/文字之下 */
+  bgImg(sf: SpriteFrame, x: number, y: number, w: number, h: number, alpha = 1): void {
+    const s = this.cur.bgSprite();
+    if (s.spriteFrame !== sf) s.spriteFrame = sf;
+    s.color = new Color(255, 255, 255, Math.round(255 * alpha));
+    s.node.getComponent(UITransform)!.setContentSize(w, h);
+    s.node.setPosition(this.tx(x + w / 2), this.ty(y + h / 2), 0);
   }
   /** 近似文本宽度（CJK≈size，ASCII≈0.55*size），用于羁绊chips排布 */
   measure(str: string, size: number): number {
