@@ -25,3 +25,7 @@ desktop.ini
 # 日志与临时
 *.log
 *.tmp
+
+# 即梦AI原始下载与中间产物（不进仓库；处理后的素材在 cocos/assets/resources/tex/）
+art_raw/
+art_keyed/
