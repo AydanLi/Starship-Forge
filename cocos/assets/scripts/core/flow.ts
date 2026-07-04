@@ -91,6 +91,17 @@ export function onReset(): void {
   else freshRun();
 }
 
+/** 从进行中的对局返回主界面：先落盘当前进度（星区/波/金币/分数），再回主菜单。
+    当前波次的熔炉/编队为临时状态，回主界面后「开始游戏」会从本波备战重新开始。 */
+export function toMenu(): void {
+  if (ads.active()) return;
+  forge.reset(); fx.clear(); ads.reset();
+  G.pUnits = []; G.eUnits = []; G.dragging = null;
+  G.story = null; G.storyQueue = [];
+  save.write(true);
+  menu.toMenu();
+}
+
 export interface UiModel { fire: string, fireOn: boolean, reset: string, resetOn: boolean, hint: string }
 export function uiModel(): UiModel {
   if (ads.active()) return { fire: '📺 广告播放中…', fireOn: false, reset: '—', resetOn: false, hint: G.hint };

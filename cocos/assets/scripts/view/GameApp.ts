@@ -25,6 +25,7 @@ const { ccclass } = _decorator;
 const BTN_FIRE = { x: 24, y: 772, w: 250, h: 50 };
 const BTN_RESET = { x: 286, y: 772, w: 116, h: 50 };
 const BTN_MUTE = { x: 414, y: 772, w: 42, h: 50 };
+const BTN_HOME = { x: 14, y: 8, w: 82, h: 30 };   // 左上角「返回主界面」（仅对局中显示）
 
 @ccclass('GameApp')
 export class GameApp extends Component {
@@ -79,6 +80,7 @@ export class GameApp extends Component {
     // 底部按钮条
     const hit = (r: any) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h;
     if (hit(BTN_MUTE)) { audio.toggle(); return; }
+    if (this.homeVisible() && hit(BTN_HOME)) { flow.toMenu(); return; }   // 对局中返回主界面
     tutorial.tap();   // 轻量提示卡：点哪都算「知道了」，且不吞掉本次输入
     const m = flow.uiModel();
     if (hit(BTN_FIRE)) { if (m.fireOn) flow.onFire(); return; }
@@ -156,9 +158,19 @@ export class GameApp extends Component {
     for (let y = 0; y <= C.H; y += 40) p.line(0, y, C.W, y, '#0e1830', 1);
   }
 
+  /** 对局中（备战/编队/战斗）才显示返回主界面按钮；剧情弹卡时不显示以免误触 */
+  private homeVisible(): boolean {
+    return !G.story && (G.phase === 'PREP' || G.phase === 'DEPLOY' || G.phase === 'BATTLE');
+  }
   private drawTopHud(): void {
     const p = this.p;
-    p.text('星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + '/' + C.WAVES_PER_LEVEL + ' 波', C.CT.left, 30, 14, '#7cf3ff', 'left', true);
+    const homeOn = this.homeVisible();
+    if (homeOn) {
+      p.roundRect(BTN_HOME.x, BTN_HOME.y, BTN_HOME.w, BTN_HOME.h, 8, '#101d33', '#8fb4d6', 1.5, 0.95);
+      p.text('🏠 主界面', BTN_HOME.x + BTN_HOME.w / 2, BTN_HOME.y + 19, 12, '#bcd4ea', 'center', true);
+    }
+    const sx = homeOn ? 106 : C.CT.left;   // 让位给左上角按钮
+    p.text('星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + '/' + C.WAVES_PER_LEVEL + ' 波', sx, 30, 14, '#7cf3ff', 'left', true);
     p.text('💰 ' + G.gold + '   分数 ' + G.score, C.CT.right, 30, 14, '#ffd08a', 'right', true);
     const syn = G.phase === 'BATTLE' ? G.pSyn
       : (G.phase === 'DEPLOY' ? synergy.compute(G.slots.filter(Boolean)).active
