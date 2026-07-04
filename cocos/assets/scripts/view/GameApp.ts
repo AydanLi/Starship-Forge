@@ -3,7 +3,7 @@
    逻辑零重复：所有玩法状态来自 core/ 模块。 */
 import { _decorator, Component, Node, UITransform, view, EventTouch, Layers } from 'cc';
 import { Painter, DESIGN_W, DESIGN_H } from './Painter';
-import { TEX, loadTex, tierKey } from './Tex';
+import { TEX, loadTex, tierKey, shipKey, bossKey, enemyKey, bgKey } from './Tex';
 import { C, clamp } from '../core/config';
 import { G } from '../core/state';
 import { STORY } from '../core/storyData';
@@ -119,8 +119,9 @@ export class GameApp extends Component {
       else if (G.phase === 'MENU') this.drawMenu();
       else this.drawMap();
     } else {
-      if (TEX['bg_battle_debris']) {
-        p.bgImg(TEX['bg_battle_debris'], 0, 0, 480, 840);
+      const arenaBg = TEX[bgKey(G.level)];
+      if (arenaBg) {
+        p.bgImg(arenaBg, 0, 0, 480, 840);
         p.fillRect(-12, -12, C.W + 24, C.H + 24, 'rgba(4,8,16,0.42)');   // 压暗保证可读性
       } else {
         p.fillRect(-12, -12, C.W + 24, C.H + 24, '#070c16');
@@ -221,7 +222,7 @@ export class GameApp extends Component {
   private drawBall(x: number, y: number, tier: number, fac?: number, cls?: number): void {
     const p = this.p, t = C.TIERS[tier], r = t.r;
     const tagged = fac !== undefined && tier >= C.DEPLOY_MIN;
-    const sf = TEX[tierKey(tier)];
+    const sf = TEX[shipKey(fac as number, tier)];
     if (sf) {
       // 真实美术：战舰图标 + 阵营色外环
       if (tagged) p.circle(x, y, r + 1, undefined, C.FAC[fac!].c, 3);
@@ -271,7 +272,7 @@ export class GameApp extends Component {
   }
   private drawToken(tok: any): void {
     const p = this.p, t = C.TIERS[tok.tier], r = 32;
-    const sf = TEX[tierKey(tok.tier)];
+    const sf = TEX[shipKey(tok.fac, tok.tier)];
     if (sf) {
       p.circle(tok.x, tok.y, r + 1, undefined, C.FAC[tok.fac].c, 3);
       p.img(sf, tok.x, tok.y, r * 2.3, r * 2.3);
@@ -300,10 +301,14 @@ export class GameApp extends Component {
     const p = this.p;
     const enemy = u.team === 'e', r = u.isBoss ? 40 : (u.summon ? 14 : 16 + u.tier * 1.6);
     const col = enemy ? (u.isBoss ? '#ff3b5c' : '#ff6a6a') : C.FAC[u.fac].c;
-    const bossSf = TEX['boss_vulture'];
-    const shipSf = (!enemy && !u.summon) ? TEX[tierKey(u.tier)] : (!enemy && u.summon ? TEX[tierKey(4)] : undefined);
+    const bossSf = TEX[bossKey(G.level)];
+    const enemySf = TEX[enemyKey(G.level)];
+    const shipSf = (!enemy && !u.summon) ? TEX[shipKey(u.fac, u.tier)] : (!enemy && u.summon ? TEX[shipKey(u.fac, 4)] : undefined);
     if (enemy && u.isBoss && bossSf) {
       p.img(bossSf, u.x, u.y, r * 2.4, r * 2.4);
+    } else if (enemy && enemySf) {
+      p.circle(u.x, u.y, r + 1, undefined, '#ff5a6e', 2);   // 红环标识敌方
+      p.img(enemySf, u.x, u.y, r * 2.2, r * 2.2);
     } else if (enemy) {
       p.poly([{ x: u.x, y: u.y + r }, { x: u.x + r, y: u.y - r * 0.7 }, { x: u.x - r, y: u.y - r * 0.7 }], col, '#ffffffbb', 1.5);
     } else if (shipSf) {
