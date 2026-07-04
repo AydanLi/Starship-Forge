@@ -77,8 +77,14 @@ export class GameApp extends Component {
   private onTouchStart(e: EventTouch): void {
     const pt = this.toGame(e);
     audio.unlock();
-    // 底部按钮条
     const hit = (r: any) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h;
+    // 主界面：右上角静音键；底部条不存在，fire/reset 不参与命中
+    if (G.phase === 'MENU') {
+      if (hit(MENU_UI.MUTE)) { audio.toggle(); return; }
+      if (pt.y <= 760) flow.pointerDown(pt.x, pt.y);
+      return;
+    }
+    // 其余阶段：底部按钮条
     if (hit(BTN_MUTE)) { audio.toggle(); return; }
     if (this.homeVisible() && hit(BTN_HOME)) { flow.toMenu(); return; }   // 对局中返回主界面
     tutorial.tap();   // 轻量提示卡：点哪都算「知道了」，且不吞掉本次输入
@@ -133,7 +139,9 @@ export class GameApp extends Component {
       this.drawTutorial();
       p.layer(0);
     }
-    this.drawBottomBar();
+    // 主界面用自带的三个按钮，不再画底部条（避免与「开始游戏/系统设置」重复）；
+    // 登录/星图仍需底部条的「进入舰桥·游客进入 / 返回主界面」等操作。
+    if (G.phase !== 'MENU') this.drawBottomBar();
     p.end();
   }
 
@@ -458,14 +466,22 @@ export class GameApp extends Component {
       this.drawStarfield();
       this.nebula(100, 160, 200, '#0a2a3a', 0.55); this.nebula(400, 300, 180, '#241030', 0.5); this.nebula(240, 700, 260, '#0a1f2e', 0.5);
     }
-    this.bigTitle(190);
-    p.text('指挥官 ' + (user.name() || '—'), C.W / 2, 268, 14, '#ffd08a', 'center', true);
-    const prog = G.maxLevel >= 5 ? '已抵达新伊甸 · 无尽征战中' : ('征程进度：星区 ' + (G.maxLevel + 1) + ' / 5');
-    p.text(prog + ' · 💰' + G.gold + ' · 分数 ' + G.score, C.W / 2, 288, 11, '#6f88a8', 'center');
+    this.bigTitle(196);
+    // 指挥官信息卡（居中一行，替代原先两行零散文字）
+    p.text('指挥官 ' + (user.name() || '—'), C.W / 2, 286, 15, '#ffd08a', 'center', true);
+    const prog = G.maxLevel >= 5 ? '已抵达新伊甸 · 无尽征战中' : ('征程 星区 ' + (G.maxLevel + 1) + '/5');
+    p.text(prog + '　💰 ' + G.gold + '　分数 ' + G.score, C.W / 2, 310, 12, '#8fb4d6', 'center');
+    // 右上角静音键（取代原底部条的 🔊）
+    const M = MENU_UI.MUTE;
+    p.roundRect(M.x, M.y, M.w, M.h, 10, 'rgba(12,23,40,0.72)', '#5f7797', 1.5, 0.95);
+    p.text(audio.muted ? '🔇' : '🔊', M.x + M.w / 2, M.y + M.h / 2 + 6, 18, '#8fb4d6', 'center');
+    // 三个主入口
     this.menuBtn(MENU_UI.MBTN.start, '▶ 开始游戏', G.level > 0 || G.wave > 0 ? '续档：星区 ' + (G.level + 1) + ' · 第 ' + (G.wave + 1) + ' 波' : '从大寂灭的残骸中启航', '#7cf3ff');
     this.menuBtn(MENU_UI.MBTN.map, '🗺 关卡选择', '打开星图 · 选择跳跃目标', '#ffb43d');
     this.menuBtn(MENU_UI.MBTN.set, '⚙ 系统设置', '音效 / 存档 / 切换指挥官', '#b06bff');
-    p.text('星舰熔炉 Cocos 版 · 掉落合成 × 自走棋', C.W / 2, 726, 10, '#31445c', 'center');
+    // 页脚：欢迎语（原底部条的 hint）+ 版本标识
+    p.text(G.hint || '星炉号待命中', C.W / 2, 712, 12, '#7cf3ff', 'center', true);
+    p.text('星舰熔炉 Cocos 版 · 掉落合成 × 自走棋', C.W / 2, 800, 10, '#31445c', 'center');
     if (G.panel === 'settings') this.drawSettings();
   }
   private drawSettings(): void {

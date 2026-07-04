@@ -16,10 +16,11 @@ export function bindLaunchSector(f: (i: number) => void) { launchSectorFn = f; }
 
 export const MENU_UI = {
   MBTN: {
-    start: { x: W / 2 - 130, y: 392, w: 260, h: 56 },
-    map:   { x: W / 2 - 130, y: 464, w: 260, h: 56 },
-    set:   { x: W / 2 - 130, y: 536, w: 260, h: 56 }
+    start: { x: W / 2 - 135, y: 456, w: 270, h: 62 },
+    map:   { x: W / 2 - 135, y: 532, w: 270, h: 62 },
+    set:   { x: W / 2 - 135, y: 608, w: 270, h: 62 }
   },
+  MUTE: { x: 416, y: 20, w: 48, h: 40 },   // 主界面右上角静音键（替代原底部条）
   SET_PANEL: { x: 70, y: 240, w: 340, h: 320 },
   SET_ROWS: {
     sound:  { x: 90, y: 292, w: 300, h: 46 },
