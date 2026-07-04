@@ -1,7 +1,7 @@
 /* GameApp.ts — 唯一需要挂到场景里的组件（挂在 Canvas 下即可）。
    职责：搭建绘制节点/触摸输入/主循环，把 web 原型 render.js 的全部绘制移植到 Painter。
    逻辑零重复：所有玩法状态来自 core/ 模块。 */
-import { _decorator, Component, Node, UITransform, view, EventTouch } from 'cc';
+import { _decorator, Component, Node, UITransform, view, EventTouch, Layers } from 'cc';
 import { Painter, DESIGN_W, DESIGN_H } from './Painter';
 import { C, clamp } from '../core/config';
 import { G } from '../core/state';
@@ -36,6 +36,7 @@ export class GameApp extends Component {
     try {
       console.log('[GameApp] onLoad start');
       this.root = new Node('GameRoot');
+      this.root.layer = Layers.Enum.UI_2D;
       this.root.addComponent(UITransform);
       this.node.addChild(this.root);
       this.fitScale();

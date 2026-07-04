@@ -1,7 +1,7 @@
 /* Painter.ts — 视图层画笔：Graphics(矢量) + Label池(文字)，
    提供与 canvas 2D 同形的接口，游戏坐标系与 web 原型一致（左上原点 480x840，含底部按钮条）。
    两个图层：0=场景，1=覆盖层（结算/剧情/广告/设置面板），保证遮罩能盖住场景文字。 */
-import { Node, Graphics, Label, Color, UITransform } from 'cc';
+import { Node, Graphics, Label, Color, UITransform, Layers } from 'cc';
 
 export const DESIGN_W = 480;
 export const DESIGN_H = 840;   // 760 游戏区 + 80 底部按钮条
@@ -29,16 +29,19 @@ class Layer {
   used = 0;
   constructor(parent: Node, name: string) {
     const gn = new Node(name + '_gfx');
+    gn.layer = Layers.Enum.UI_2D;
     gn.addComponent(UITransform);
     this.gfx = gn.addComponent(Graphics);
     parent.addChild(gn);
     this.labelRoot = new Node(name + '_labels');
+    this.labelRoot.layer = Layers.Enum.UI_2D;
     this.labelRoot.addComponent(UITransform);
     parent.addChild(this.labelRoot);
   }
   label(): Label {
     if (this.used < this.labels.length) { const l = this.labels[this.used++]; l.node.active = true; return l; }
     const n = new Node('lb' + this.labels.length);
+    n.layer = Layers.Enum.UI_2D;
     n.addComponent(UITransform);
     const l = n.addComponent(Label);
     l.cacheMode = Label.CacheMode.NONE;
