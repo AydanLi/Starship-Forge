@@ -16,6 +16,7 @@ import { fleet } from '../core/fleet';
 import { econ } from '../core/economy';
 import { ads } from '../core/ads';
 import { menu, MENU_UI } from '../core/menu';
+import { tutorial } from '../core/tutorial';
 import * as flow from '../core/flow';
 
 const { ccclass } = _decorator;
@@ -78,6 +79,7 @@ export class GameApp extends Component {
     // 底部按钮条
     const hit = (r: any) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h;
     if (hit(BTN_MUTE)) { audio.toggle(); return; }
+    tutorial.tap();   // 轻量提示卡：点哪都算「知道了」，且不吞掉本次输入
     const m = flow.uiModel();
     if (hit(BTN_FIRE)) { if (m.fireOn) flow.onFire(); return; }
     if (hit(BTN_RESET)) { if (m.resetOn) flow.onReset(); return; }
@@ -90,6 +92,7 @@ export class GameApp extends Component {
   update(dt: number): void {
     try {
       flow.step(Math.min(0.05, dt));
+      tutorial.step(Math.min(0.05, dt));
       this.render();
     } catch (e: any) {
       if (!this._err) { this._err = true; console.error('[GameApp] render ERROR:', e && e.stack ? e.stack : e); }
@@ -125,6 +128,7 @@ export class GameApp extends Component {
       if (G.phase === 'GAMEOVER') this.drawOver();
       if (G.story) this.drawStory();
       if (ads.active()) this.drawAd();
+      this.drawTutorial();
       p.layer(0);
     }
     this.drawBottomBar();
@@ -354,6 +358,30 @@ export class GameApp extends Component {
       y += 8;
     }
     p.text('▶ 点击「' + (s.btn || '继续') + '」', C.W / 2, py + ph - 16, 13, '#8fd8ff', 'center', true);
+  }
+  /** 新手指引提示卡（轻量气泡：不遮屏不锁操作） */
+  private drawTutorial(): void {
+    const tip = tutorial.current();
+    if (!tip) return;
+    const p = this.p;
+    const pad = 14, lh = 22;
+    const h = pad * 2 + tip.lines.length * lh + 20;
+    const bx = tip.x, by = tip.y, bw = tip.w;
+    // 呼吸感：微弱的透明度脉动
+    const t = Date.now() / 1000;
+    const glow = 0.75 + 0.25 * Math.sin(t * 3);
+    p.roundRect(bx, by, bw, h, 12, 'rgba(8,20,36,0.92)', '#7cf3ff', 2, 1);
+    p.roundRect(bx, by, bw, 4, 2, '#7cf3ff', undefined, 1, glow * 0.9);
+    let y = by + pad + 12;
+    for (let i = 0; i < tip.lines.length; i++) {
+      p.text(tip.lines[i], bx + pad, y, 13, i === 0 ? '#aef5ff' : '#cfe0f2', 'left', i === 0);
+      y += lh;
+    }
+    p.text('点按任意处继续 ▸', bx + bw - pad, by + h - 12, 10, '#5f97b8', 'right');
+    // 指向箭头：目标在气泡上方 → 从顶边向上；否则从底边向下
+    const ax = tip.arrowX, tipY = tip.arrowY;
+    if (tipY < by) p.poly([{ x: ax - 8, y: by + 1 }, { x: ax + 8, y: by + 1 }, { x: ax, y: tipY }], '#7cf3ff', undefined, 1, glow);
+    else p.poly([{ x: ax - 8, y: by + h - 1 }, { x: ax + 8, y: by + h - 1 }, { x: ax, y: tipY }], '#7cf3ff', undefined, 1, glow);
   }
   private wrapText(text: string, size: number, maxW: number): string[] {
     const out: string[] = []; let line = '';

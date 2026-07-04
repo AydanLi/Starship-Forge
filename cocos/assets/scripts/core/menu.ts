@@ -5,6 +5,7 @@ import { user } from './user';
 import { save } from './save';
 import { audio } from './audio';
 import { platform } from './platform';
+import { tutorial } from './tutorial';
 
 let uiDirty = () => {};
 let startGameFn = () => {};
@@ -90,7 +91,7 @@ export const menu = {
       if (G.panel === 'settings') {
         const R = MENU_UI.SET_ROWS;
         if (inRect(px, py, R.sound)) { audio.toggle(); uiDirty(); return; }
-        if (inRect(px, py, R.wipe)) { save.clear(); loadProfile(); flashHint('本账号存档已清除'); audio.play('deny'); return; }
+        if (inRect(px, py, R.wipe)) { save.clear(); tutorial.resetFlag(); loadProfile(); flashHint('本账号存档已清除（新手指引将重新出现）'); audio.play('deny'); return; }
         if (inRect(px, py, R.logout)) { save.write(true); user.logout(); this.toLogin(); return; }
         if (inRect(px, py, R.close)) { this.closeSettings(); return; }
         return;
