@@ -4,6 +4,7 @@
 import { _decorator, Component, Node, UITransform, view, EventTouch, Layers } from 'cc';
 import { Painter, DESIGN_W, DESIGN_H } from './Painter';
 import { TEX, loadTex, tierKey, shipKey, bossKey, enemyKey, bgKey } from './Tex';
+import { loadBgm, updateBgm } from './Bgm';
 import { C, clamp } from '../core/config';
 import { G } from '../core/state';
 import { STORY } from '../core/storyData';
@@ -53,6 +54,7 @@ export class GameApp extends Component {
       this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
 
       loadTex();
+      loadBgm(this.node);
       flow.boot();
       console.log('[GameApp] boot done, phase=', G.phase);
     } catch (e: any) {
@@ -101,6 +103,7 @@ export class GameApp extends Component {
     try {
       flow.step(Math.min(0.05, dt));
       tutorial.step(Math.min(0.05, dt));
+      updateBgm(Math.min(0.05, dt));
       this.render();
     } catch (e: any) {
       if (!this._err) { this._err = true; console.error('[GameApp] render ERROR:', e && e.stack ? e.stack : e); }
