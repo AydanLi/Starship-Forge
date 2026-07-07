@@ -17,6 +17,10 @@ local/
 !.vscode/extensions.json
 .idea/
 
+# Codex 本地工作区元数据
+.agents/
+.codex/
+
 # 系统
 .DS_Store
 Thumbs.db
