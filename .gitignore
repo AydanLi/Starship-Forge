@@ -33,3 +33,6 @@ desktop.ini
 # 即梦AI原始下载与中间产物（不进仓库；处理后的素材在 cocos/assets/resources/tex/）
 art_raw/
 art_keyed/
+
+# git 锁/临时文件安置区(挂载盘禁止删除,只能挪进来;可随时手动整目录删除)
+_to_delete/
