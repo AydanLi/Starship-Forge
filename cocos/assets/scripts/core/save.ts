@@ -39,4 +39,5 @@ export const save = {
   clear(): void { platform.removeItem(KEY()); },
   hasProgress(d: any): boolean { return !!d && (d.level > 0 || d.wave > 0 || d.gold > 0 || d.score > 0); }
   /* 云同步接口约定与 js/save.js 一致：remote.pull/push/verify，服务器 HMAC 权威档，
-     登录后比对（本地 tampered→强制服务器档；双方有效→进度高者合并
+     登录后比对（本地 tampered→强制服务器档；双方有效→进度高者合并回传）。 */
+};

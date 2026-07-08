@@ -149,4 +149,7 @@ export function pointerMove(px: number, py: number): void {
   if (G.phase === 'PREP' && G.current) G.current.x = px;
   else if (G.phase === 'DEPLOY') board.dragMove(px, py);
 }
-export function poin
+export function pointerUp(px: number, py: number): void {
+  if (G.phase === 'DEPLOY') board.dragEnd(px, py);
+}
+export function pointerCancel(): void { board.cancelDrag(); }

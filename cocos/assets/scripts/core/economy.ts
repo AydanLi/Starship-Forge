@@ -51,4 +51,7 @@ export const econ = {
     if (G.result === 'lose' && inRect(px, py, C.BTN_OVERLOAD)) {
       ads.show('旗舰超载', () => { G.overloadBoost = true; retryWaveFn(); setHint('⚡ 超载待命：下次开战全队攻击 +50%'); });
       return true;
-   
+    }
+    return false;
+  }
+};

@@ -39,4 +39,4 @@ export const rand = (a: number, b: number) => a + Math.random() * (b - a);
 export const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export const inRect = (px: number, py: number, r: { x: number, y: number, w: number, h: number }) =>
   px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
-export const pickDropTier = () => rng.pick(C.DROP_POOL);   /
+export const pickDropTier = () => rng.pick(C.DROP_POOL);   // 玩法随机走可播种 rng

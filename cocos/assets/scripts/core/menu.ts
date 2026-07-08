@@ -106,4 +106,8 @@ export const menu = {
     if (G.phase === 'MAP') {
       for (let i = 0; i < MENU_UI.NODES.length; i++) {
         const n = MENU_UI.NODES[i];
-        if (Math.hyp
+        if (Math.hypot(px - n.x, py - n.y) < MENU_UI.NODE_R) { this.selectSector(i); return; }
+      }
+    }
+  }
+};

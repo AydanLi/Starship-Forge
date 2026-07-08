@@ -84,3 +84,4 @@ export const forge = {
   bodies(): any[] { return world ? Matter.Composite.allBodies(world) : []; },
   deployables(): any[] { return this.bodies().filter((b: any) => b.gTier >= C.DEPLOY_MIN); },
   update(dt: number): void { Matter.Engine.update(engine, 1000 / 60); processMerges(); checkOverflow(dt); }
+};

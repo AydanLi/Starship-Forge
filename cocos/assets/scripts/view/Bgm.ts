@@ -57,4 +57,14 @@ export function updateBgm(dt: number): void {
     }
     src.stop(); curKey = wantKey; vol = 0;
     if (!curKey) return;
-    curLoop = want!.lo
+    curLoop = want!.loop;
+    src.clip = CLIPS[curKey];
+    src.loop = curLoop;
+    try { src.play(); } catch (e) {}
+  }
+  if (!curKey) return;
+  // 循环曲被浏览器手势策略拦下时持续补播；单次曲自然播完则不重播
+  if (!src.playing && src.clip && curLoop) { try { src.play(); } catch (e) {} }
+  vol = Math.min(VOL, vol + FADE_IN * dt);
+  src.volume = vol;
+}
