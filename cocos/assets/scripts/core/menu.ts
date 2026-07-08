@@ -41,7 +41,7 @@ function loadProfile(): void {
   const r = save.load();
   G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0; G.seed = 0;
   if (r && r.tampered) { save.clear(); flashHint('⚠ 存档校验失败（疑似被修改），该账号进度已重置'); return; }
-  if (r && r.data) { const d = r.data; G.level = d.level; G.wave = d.wave; G.gold = d.gold; G.score = d.score; G.bestTier = d.bestTier; G.maxLevel = d.maxLevel || d.level; G.seed = d.seed || 0; if (G.seed) seedRng(G.seed); }
+  if (r && r.data) { const d = r.data; G.level = d.level; G.wave = d.wave; G.gold = d.gold; G.score = d.score; G.bestTier = d.bestTier; G.maxLevel = d.maxLevel || d.level; G.seed = d.seed || 0; if (G.seed) seedRng(G.seed); G.pendingForge = (d.forge && d.forge.length) ? d.forge : null; }
 }
 
 export const menu = {

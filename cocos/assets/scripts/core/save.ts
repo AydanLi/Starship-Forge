@@ -2,6 +2,7 @@
 import { platform } from './platform';
 import { G } from './state';
 import { user } from './user';
+import { forge } from './forge';
 
 const SALT = 'SF-proto-2026';   // 原型盐值；正式版删除，改由服务器端 HMAC 私钥签名
 let lastWrite = 0;
@@ -13,7 +14,7 @@ function hash(str: string): string {
 }
 function KEY(): string { return 'starforge_save_v1:' + (user.uid() || 'guest'); }
 function payload() {
-  return { v: 1, level: G.level, wave: G.wave, gold: G.gold, score: G.score, bestTier: G.bestTier, maxLevel: G.maxLevel, seed: G.seed || 0, ts: platform.now() };
+  return { v: 1, level: G.level, wave: G.wave, gold: G.gold, score: G.score, bestTier: G.bestTier, maxLevel: G.maxLevel, seed: G.seed || 0, forge: forge.snapshot(), ts: platform.now() };
 }
 
 export const save = {

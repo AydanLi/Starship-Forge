@@ -20,13 +20,17 @@ import { seedRng } from './rng';
 
 function noop() {}
 
-export function launch(opts?: { intro?: boolean, sectorCard?: number }): void {
+export function launch(opts?: { intro?: boolean, sectorCard?: number, fresh?: boolean }): void {
   opts = opts || {};
+  // M2 跨波舰队:launch 会重建物理世界,先带走现有舰队(或续档快照),重建后放回
+  const carry = opts.fresh ? [] : ((G.pendingForge && G.pendingForge.length) ? G.pendingForge : forge.snapshot());
   forge.reset(); fx.clear(); ads.reset();
+  if (carry.length) forge.restore(carry);
+  G.pendingForge = null;
   G.pUnits = []; G.eUnits = []; G.slots = [null, null, null, null, null, null]; G.bench = []; G.dragging = null;
   G.story = null; G.storyQueue = []; G.panel = null;
   G.lastGain = 0; G.goldDoubled = true; G.overloadBoost = false;
-  G.phase = 'PREP'; G.over = false;
+  G.phase = 'PREP'; G.over = false; G.overHandled = false;
   G.nextTier = pickDropTier();
   forge.spawnCurrent();
   if (opts.intro) { setHint(PREP_HINT); storySys.queue(STORY.INTRO, STORY.SECTORS[0]); storySys.advance(); }
@@ -42,7 +46,7 @@ export function freshRun(): void {
   save.clear();
   G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0;
   G.seed = seedRng();
-  launch({ intro: true });
+  launch({ intro: true, fresh: true });
 }
 export function toPrep(msg: string): void {
   G.pUnits = []; G.eUnits = [];
@@ -60,7 +64,14 @@ export function nextAfterWin(): void {
   else if (G.wave === C.WAVES_PER_LEVEL - 1) storySys.queue(storySys.bossCard(G.level));
   storySys.advance();
 }
-export function retryWave(): void { toPrep('备战：重整旗鼓，重新合成部署'); }
+export function retryWave(): void {
+  // M2:失败不结算损耗——开战前的上阵舰队原样回炉再战
+  if (G.result === 'lose' && G.deployedSnapshot && G.deployedSnapshot.length) {
+    for (const sp of G.deployedSnapshot) forge.returnShip(sp.tier, sp.fac, sp.cls, sp.star);
+  }
+  G.deployedSnapshot = null;
+  toPrep('备战：舰队已回炉，重整旗鼓再战');
+}
 
 export function boot(): void {
   // 系统间回调接线（替代 web 版的 SF 全局查找）
@@ -97,10 +108,16 @@ export function onReset(): void {
     当前波次的熔炉/编队为临时状态，回主界面后「开始游戏」会从本波备战重新开始。 */
 export function toMenu(): void {
   if (ads.active()) return;
+  // M2:舰队是跨波资产——战斗/败北中途回主界面,开战阵容先原样回炉,再连同熔炉快照落档
+  if (G.deployedSnapshot && G.deployedSnapshot.length) {
+    for (const s of G.deployedSnapshot) forge.returnShip(s.tier, s.fac, s.cls, s.star);
+    G.deployedSnapshot = null;
+  }
+  G.pendingForge = forge.snapshot();   // 本会话内下次 launch 直接恢复
+  save.write(true);                     // 此时舰队仍在世界里,存档带上完整快照
   forge.reset(); fx.clear(); ads.reset();
   G.pUnits = []; G.eUnits = []; G.dragging = null;
   G.story = null; G.storyQueue = [];
-  save.write(true);
   menu.toMenu();
 }
 
@@ -126,6 +143,12 @@ export function uiModel(): UiModel {
 export function step(dt: number): void {
   ads.update(dt);
   tickHint(dt);
+  // M2:熔炉过载 = 本局舰队全灭(风险自担),清空熔炉并立刻落档,防止重进白嫖
+  if (G.phase === 'GAMEOVER' && G.over && !G.overHandled) {
+    G.overHandled = true;
+    forge.reset();
+    save.write(true);
+  }
   if (!G.story && !ads.active()) {
     if (G.phase === 'PREP') forge.update(dt);
     else if (G.phase === 'BATTLE') battle.update(dt);

@@ -7,7 +7,7 @@ export const G: any = {
   phase: 'LOGIN' as Phase,
   // 熔炉
   current: null as null | { tier: number, x: number },
-  nextTier: 0, canDrop: false, over: false,
+  nextTier: 0, canDrop: false, over: false, overHandled: false,
   // 进度
   score: 0, gold: 0, level: 0, wave: 0, bestTier: 0, maxLevel: 0, seed: 0,
   panel: null as null | 'settings',
@@ -24,19 +24,24 @@ export const G: any = {
   // 剧情 / 经济
   story: null as any, storyQueue: [] as any[],
   lastGain: 0, goldDoubled: true, overloadBoost: false,
+  // 跨波舰队(M2):开战快照(失败重试还原用)/ 续档待恢复熔炉 / 结算回流统计
+  deployedSnapshot: null as any[] | null, pendingForge: null as any[] | null,
+  lastSalvage: 0, lastLost: 0, lastReturned: 0,
   // 提示条（视图层读取）
   hint: '', hintTimer: 0
 };
 
 export function resetG(): void {
   G.phase = 'PREP';
-  G.current = null; G.canDrop = false; G.over = false;
+  G.current = null; G.canDrop = false; G.over = false; G.overHandled = false;
   G.score = 0; G.gold = 0; G.level = 0; G.wave = 0; G.bestTier = 0; G.maxLevel = 0; G.seed = 0; G.panel = null;
   G.slots = [null, null, null, null, null, null]; G.bench = []; G.dragging = null;
   G.pUnits = []; G.eUnits = []; G.pBuffs = null; G.pSyn = [];
   G.tacticalCd = 0; G.tacticalReady = false; G.battleTime = 0; G.result = ''; G.bossName = '';
   G.story = null; G.storyQueue = [];
   G.lastGain = 0; G.goldDoubled = true; G.overloadBoost = false;
+  G.deployedSnapshot = null; G.pendingForge = null;
+  G.lastSalvage = 0; G.lastLost = 0; G.lastReturned = 0;
   G.nextTier = pickDropTier();
 }
 

@@ -25,6 +25,14 @@ export const C = {
   FAC: [{ name: '帝国', c: '#ff9d00' }, { name: '异星', c: '#ff2e5b' }, { name: '机械', c: '#5fb0ff' }, { name: '赛博', c: '#b06bff' }],
   CLS: [{ name: '突击' }, { name: '炮舰' }, { name: '无人机' }, { name: '辅助' }],
   WAVES_PER_LEVEL: 3,
+  /* M2 敌方强度表(跨波回流后整体上调;调平衡只改这里) */
+  ENEMY: {
+    hp: 260, hpLv: 0.5, hpWv: 0.3, atk: 26, atkLv: 0.44,          // 普通波
+    bossHp: 1600, bossHpLv: 0.58, bossAtk: 64, bossAtkLv: 0.5,    // Boss
+    minHp: 340, minAtk: 28, minLv: 0.45                            // Boss 护卫
+  },
+  /* M2 跨波舰队:阵亡残骸回收率 / 船坞容量(单次回流上限) / 超限折价率 */
+  SALVAGE_RATE: 0.3, DOCK_CAP: 10, DOCK_OVER_RATE: 0.6,
   REFRESH_COST: 8, RECRUIT_COST: 15,
   AD_SECONDS: 3,
   SLOTC: [{ x: 138, y: 300 }, { x: 240, y: 300 }, { x: 342, y: 300 },

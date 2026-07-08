@@ -215,15 +215,16 @@ export class GameApp extends Component {
     p.line(C.CT.left, C.CT.top, C.CT.left, C.CT.floor, '#274063', 3);
     p.line(C.CT.left, C.CT.floor, C.CT.right, C.CT.floor, '#274063', 3);
     p.line(C.CT.right, C.CT.floor, C.CT.right, C.CT.top, '#274063', 3);
-    for (const b of forge.bodies()) { if (b.gTier === undefined) continue; this.drawBall(b.position.x, b.position.y, b.gTier, b.fac, b.cls); }
+    for (const b of forge.bodies()) { if (b.gTier === undefined) continue; this.drawBall(b.position.x, b.position.y, b.gTier, b.fac, b.cls, b.gStar); }
     if (G.current && G.phase === 'PREP') {
       const r = C.TIERS[G.current.tier].r, x = clamp(G.current.x, C.CT.left + r, C.CT.right - r);
       p.dashLine(x, C.Y_DROP + r, x, C.CT.floor, '#8fe8ff', 1, 4, 6, 0.3);
       this.drawBall(x, C.Y_DROP, G.current.tier, undefined, undefined);
     }
   }
-  private drawBall(x: number, y: number, tier: number, fac?: number, cls?: number): void {
+  private drawBall(x: number, y: number, tier: number, fac?: number, cls?: number, star?: number): void {
     const p = this.p, t = C.TIERS[tier], r = t.r;
+    if (star && star > 1) p.text('★'.repeat(Math.min(star, 3)), x, y - r - 5, 11, '#ffd54a', 'center', true);   // M2:回流战舰保留星级
     const tagged = fac !== undefined && tier >= C.DEPLOY_MIN;
     const sf = TEX[shipKey(fac as number, tier)];
     if (sf) {
@@ -344,12 +345,13 @@ export class GameApp extends Component {
     if (G.result === 'win') {
       p.text('战斗胜利', C.W / 2, C.H / 2 - 30, 34, '#7cf3ff', 'center', true);
       p.text(G.wave === C.WAVES_PER_LEVEL - 1 ? '★ 星区 Boss 已击破！' : '本波清剿完成', C.W / 2, C.H / 2 + 4, 16, '#ffd08a', 'center');
-      p.text('金币 +' + G.lastGain, C.W / 2, C.H / 2 + 30, 16, '#aef5ff', 'center');
+      p.text('金币 +' + G.lastGain + (G.lastSalvage ? '　残骸回收 +' + G.lastSalvage : ''), C.W / 2, C.H / 2 + 30, 16, '#aef5ff', 'center');
+      p.text('舰队返航入坞 ' + G.lastReturned + ' 艘' + (G.lastLost ? ' · 阵亡 ' + G.lastLost + ' 艘' : ' · 无损'), C.W / 2, C.H / 2 + 52, 12, '#8fd8ff', 'center');
     } else {
       p.text('舰队覆灭', C.W / 2, C.H / 2 - 30, 34, '#ff5a7a', 'center', true);
-      p.text('回熔炉重整旗鼓，凑更强的羁绊/升星再战', C.W / 2, C.H / 2 + 6, 15, '#cfe0f2', 'center');
+      p.text('重试不结算损耗：舰队将原样回炉，重整旗鼓再战', C.W / 2, C.H / 2 + 6, 15, '#cfe0f2', 'center');
     }
-    p.text('点击下方按钮继续', C.W / 2, C.H / 2 + 52, 12, '#6f88a8', 'center');
+    if (G.result !== 'win') p.text('点击下方按钮继续', C.W / 2, C.H / 2 + 52, 12, '#6f88a8', 'center');
     if (G.result === 'win' && !G.goldDoubled) this.drawAdBtn(C.BTN_DOUBLE, '📺 看广告 · 金币双倍 (+' + G.lastGain + ')');
     if (G.result === 'lose') this.drawAdBtn(C.BTN_OVERLOAD, '📺 旗舰超载 · 下次开战全队攻击 +50%');
   }

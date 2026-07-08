@@ -21,14 +21,15 @@ export const fleet = {
   },
   genEnemies(lv: number, wv: number): any[] {
     const isBoss = wv === C.WAVES_PER_LEVEL - 1, arr: any[] = [];
+    const E = C.ENEMY;   // M2:强度全部数据化(调平衡改 config.ENEMY)
     if (isBoss) {
       G.bossName = STORY.BOSS_NAMES[Math.min(lv, 4)];
-      const boss = this.mkEnemy(1500 * (1 + 0.5 * lv), 60 * (1 + 0.45 * lv), 0.85);
+      const boss = this.mkEnemy(E.bossHp * (1 + E.bossHpLv * lv), E.bossAtk * (1 + E.bossAtkLv * lv), 0.85);
       boss.isBoss = true; boss.name = G.bossName; arr.push(boss);
-      for (let i = 0; i < (lv >= 1 ? 2 : 1); i++) arr.push(this.mkEnemy(320 * (1 + 0.4 * lv), 26 * (1 + 0.4 * lv), 1.0));
+      for (let i = 0; i < (lv >= 1 ? 2 : 1); i++) arr.push(this.mkEnemy(E.minHp * (1 + E.minLv * lv), E.minAtk * (1 + E.minLv * lv), 1.0));
     } else {
       const n = Math.min(5, 3 + lv);
-      for (let i = 0; i < n; i++) arr.push(this.mkEnemy(240 * (1 + 0.42 * lv) * (1 + 0.25 * wv), 24 * (1 + 0.38 * lv), 1.0));
+      for (let i = 0; i < n; i++) arr.push(this.mkEnemy(E.hp * (1 + E.hpLv * lv) * (1 + E.hpWv * wv), E.atk * (1 + E.atkLv * lv), 1.0));
     }
     return arr;
   },

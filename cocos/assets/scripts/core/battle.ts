@@ -46,9 +46,16 @@ export const battle = {
     const placedIdx: number[] = []; G.slots.forEach((t: any, i: number) => { if (t) placedIdx.push(i); });
     if (!placedIdx.length) { flashHint('至少放一艘战舰进阵位再开战'); return; }
     G.pUnits = [];
+    // M2 跨波:记录开战阵容快照(失败重试原样还原),每个单位记来源(胜利后回流)
+    G.deployedSnapshot = placedIdx.map(i => {
+      const t = G.slots[i];
+      return { tier: t.tier, fac: t.fac, cls: t.cls, star: t.star };
+    });
     placedIdx.forEach(i => {
-      const u = fleet.unitFromToken(G.slots[i]); u.front = i < 3;
-      for (const b of G.slots[i].bodies) forge.removeBody(b);
+      const t = G.slots[i];
+      const u = fleet.unitFromToken(t); u.front = i < 3;
+      u.src = { tier: t.tier, fac: t.fac, cls: t.cls, star: t.star };
+      for (const b of t.bodies) forge.removeBody(b);
       G.pUnits.push(u);
     });
     const s = synergy.compute(G.pUnits); G.pBuffs = s.buffs; G.pSyn = s.active;
@@ -91,12 +98,22 @@ export const battle = {
     G.result = r; G.phase = 'RESULT';
     audio.play(r === 'win' ? 'win' : 'lose');
     if (r === 'win') {
+      // M2 跨波刚体回流:存活者返航入坞;阵亡者残骸回收;船坞超限折价
+      let salvage = 0, lost = 0, returned = 0;
+      for (const u of G.pUnits) {
+        if (!u.src || u.summon) continue;
+        if (!u.alive) { lost++; salvage += Math.round(C.VALUE[u.src.tier] * C.STAR_MUL[u.src.star] * C.SALVAGE_RATE); }
+        else if (returned < C.DOCK_CAP) { forge.returnShip(u.src.tier, u.src.fac, u.src.cls, u.src.star); returned++; }
+        else salvage += Math.round(C.VALUE[u.src.tier] * C.STAR_MUL[u.src.star] * C.DOCK_OVER_RATE);
+      }
+      G.lastSalvage = salvage; G.lastLost = lost; G.lastReturned = returned;
+      G.deployedSnapshot = null;
       const boss = G.wave === C.WAVES_PER_LEVEL - 1;
       G.lastGain = boss ? 30 + G.level * 5 : 10 + G.level * 2;
-      G.gold += G.lastGain; G.goldDoubled = false;
-      setHint('胜利！可看广告双倍金币，或点「' + (boss ? '进入下一星区' : '下一波') + '」');
+      G.gold += G.lastGain + salvage; G.goldDoubled = false;
+      setHint('胜利！舰队返航 ' + returned + ' 艘' + (lost ? '，损失 ' + lost + ' 艘（残骸回收 +' + salvage + '💰）' : '') + '，可看广告双倍金币');
       save.write(true);
-    } else setHint('舰队覆灭——可看广告「旗舰超载」加成重打，或直接重试');
+    } else setHint('舰队覆灭——重试不结算损耗，舰队将原样回炉；也可看广告「旗舰超载」加成重打');
     uiDirty();
   }
 };
