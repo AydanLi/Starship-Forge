@@ -1,6 +1,7 @@
 /* forge.ts — 熔炉：matter.js 物理、投放、同级合成、过载（与 js/forge.js 一致）。
    matter.min.js 以插件脚本加载，提供全局 Matter（见 globals.d.ts）。 */
 import { C, clamp, pickDropTier } from './config';
+import { rng } from './rng';
 import { G } from './state';
 import { fx } from './fx';
 import { audio } from './audio';
@@ -75,7 +76,7 @@ export const forge = {
     const M = Matter, r = C.TIERS[tier].r;
     const b = M.Bodies.circle(x, y, r, { restitution: 0.08, friction: 0.4, frictionStatic: 0.6, density: 0.001, slop: 0.02 });
     b.gTier = tier; b.merging = false; b.overTime = 0; b.born = performance.now();
-    if (tier >= C.DEPLOY_MIN) { b.fac = (Math.random() * 4) | 0; b.cls = (Math.random() * 4) | 0; }
+    if (tier >= C.DEPLOY_MIN) { b.fac = rng.int(4); b.cls = rng.int(4); }
     if (vy) M.Body.setVelocity(b, { x: 0, y: vy });
     M.Composite.add(world, b); return b;
   },
@@ -83,4 +84,3 @@ export const forge = {
   bodies(): any[] { return world ? Matter.Composite.allBodies(world) : []; },
   deployables(): any[] { return this.bodies().filter((b: any) => b.gTier >= C.DEPLOY_MIN); },
   update(dt: number): void { Matter.Engine.update(engine, 1000 / 60); processMerges(); checkOverflow(dt); }
-};

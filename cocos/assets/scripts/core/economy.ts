@@ -1,5 +1,6 @@
 /* economy.ts — 金币消费与结算页广告点位入口（与 js/economy.js 一致）。 */
-import { C, rand, inRect, pickDropTier } from './config';
+import { C, inRect, pickDropTier } from './config';
+import { rng } from './rng';
 import { G, setHint, flashHint } from './state';
 import { forge } from './forge';
 import { fx } from './fx';
@@ -24,7 +25,7 @@ function spendRecruit(): void {
   G.gold -= C.RECRUIT_COST; audio.play('coin'); grantRecruit(); save.write();
 }
 function grantRecruit(): void {
-  const x = rand(C.CT.left + 60, C.CT.right - 60);
+  const x = rng.range(C.CT.left + 60, C.CT.right - 60);
   forge.addBall(C.DEPLOY_MIN, x, C.Y_DROP, 0.5);
   fx.burst(x, C.Y_DROP + 20, '#7cf3ff', 14); fx.setShake(5); audio.play('deploy');
   flashHint('援军空降！一艘攻击无人机加入熔炉'); uiDirty();
@@ -50,7 +51,4 @@ export const econ = {
     if (G.result === 'lose' && inRect(px, py, C.BTN_OVERLOAD)) {
       ads.show('旗舰超载', () => { G.overloadBoost = true; retryWaveFn(); setHint('⚡ 超载待命：下次开战全队攻击 +50%'); });
       return true;
-    }
-    return false;
-  }
-};
+   

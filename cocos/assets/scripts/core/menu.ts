@@ -6,6 +6,7 @@ import { save } from './save';
 import { audio } from './audio';
 import { platform } from './platform';
 import { tutorial } from './tutorial';
+import { seedRng } from './rng';
 
 let uiDirty = () => {};
 let startGameFn = () => {};
@@ -38,9 +39,9 @@ export const MENU_UI = {
 
 function loadProfile(): void {
   const r = save.load();
-  G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0;
+  G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0; G.seed = 0;
   if (r && r.tampered) { save.clear(); flashHint('⚠ 存档校验失败（疑似被修改），该账号进度已重置'); return; }
-  if (r && r.data) { const d = r.data; G.level = d.level; G.wave = d.wave; G.gold = d.gold; G.score = d.score; G.bestTier = d.bestTier; G.maxLevel = d.maxLevel || d.level; }
+  if (r && r.data) { const d = r.data; G.level = d.level; G.wave = d.wave; G.gold = d.gold; G.score = d.score; G.bestTier = d.bestTier; G.maxLevel = d.maxLevel || d.level; G.seed = d.seed || 0; if (G.seed) seedRng(G.seed); }
 }
 
 export const menu = {
@@ -105,8 +106,4 @@ export const menu = {
     if (G.phase === 'MAP') {
       for (let i = 0; i < MENU_UI.NODES.length; i++) {
         const n = MENU_UI.NODES[i];
-        if (Math.hypot(px - n.x, py - n.y) < MENU_UI.NODE_R) { this.selectSector(i); return; }
-      }
-    }
-  }
-};
+        if (Math.hyp

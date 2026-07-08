@@ -9,7 +9,7 @@ export const G: any = {
   current: null as null | { tier: number, x: number },
   nextTier: 0, canDrop: false, over: false,
   // 进度
-  score: 0, gold: 0, level: 0, wave: 0, bestTier: 0, maxLevel: 0,
+  score: 0, gold: 0, level: 0, wave: 0, bestTier: 0, maxLevel: 0, seed: 0,
   panel: null as null | 'settings',
   pendingName: '',          // 登录页正在输入的代号
   // 编队
@@ -31,7 +31,7 @@ export const G: any = {
 export function resetG(): void {
   G.phase = 'PREP';
   G.current = null; G.canDrop = false; G.over = false;
-  G.score = 0; G.gold = 0; G.level = 0; G.wave = 0; G.bestTier = 0; G.maxLevel = 0; G.panel = null;
+  G.score = 0; G.gold = 0; G.level = 0; G.wave = 0; G.bestTier = 0; G.maxLevel = 0; G.seed = 0; G.panel = null;
   G.slots = [null, null, null, null, null, null]; G.bench = []; G.dragging = null;
   G.pUnits = []; G.eUnits = []; G.pBuffs = null; G.pSyn = [];
   G.tacticalCd = 0; G.tacticalReady = false; G.battleTime = 0; G.result = ''; G.bossName = '';
@@ -44,5 +44,4 @@ export const PREP_HINT = '备战：合成战舰（5级起带阵营/舰种），�
 export function setHint(t: string): void { G.hint = t; G.hintTimer = 0; }
 export function flashHint(t: string): void { G.hint = t; G.hintTimer = 2; }
 export function tickHint(dt: number): void {
-  if (G.hintTimer > 0) { G.hintTimer -= dt; if (G.hintTimer <= 0 && G.phase === 'PREP') G.hint = PREP_HINT; }
-}
+  if (G.hintTimer > 0) { G.hintTimer -= dt; if (G.hintTimer <= 0 && G.phase === 'PREP') G.h

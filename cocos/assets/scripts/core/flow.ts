@@ -16,6 +16,7 @@ import { storySys, bindUiDirty as storyBind } from './story';
 import { menu, bindUiDirty as menuBind, bindStartGame, bindLaunchSector } from './menu';
 import { STORY } from './storyData';
 import { pickDropTier } from './config';
+import { seedRng } from './rng';
 
 function noop() {}
 
@@ -35,11 +36,12 @@ export function launch(opts?: { intro?: boolean, sectorCard?: number }): void {
 }
 export function startGame(): void {
   if (G.level > 0 || G.wave > 0 || G.gold > 0 || G.score > 0) launch({});
-  else launch({ intro: true });
+  else { G.seed = seedRng(); launch({ intro: true }); }   // 新征程 → 新 seed（续档时 seed 已在 loadProfile 恢复）
 }
 export function freshRun(): void {
   save.clear();
   G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0;
+  G.seed = seedRng();
   launch({ intro: true });
 }
 export function toPrep(msg: string): void {
@@ -147,7 +149,4 @@ export function pointerMove(px: number, py: number): void {
   if (G.phase === 'PREP' && G.current) G.current.x = px;
   else if (G.phase === 'DEPLOY') board.dragMove(px, py);
 }
-export function pointerUp(px: number, py: number): void {
-  if (G.phase === 'DEPLOY') board.dragEnd(px, py);
-}
-export function pointerCancel(): void { board.cancelDrag(); }
+export function poin

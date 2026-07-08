@@ -1,8 +1,10 @@
 /* Bgm.ts — 背景音乐播放器（Cocos AudioSource）。
-   加载 resources/audio/ 下的 bgm_*.mp3，每帧与 core/bgm.pickBgm() 对账：
+   音频位于独立 Asset Bundle「audio」(assets/audio/，用于抖音分包，主包 4MB 限制)，
+   通过 assetManager.loadBundle 异步加载；每帧与 core/bgm.pickBgm() 对账：
    切曲时先淡出旧曲再切入新曲；静音跟随 core/audio（🔊 按钮）；
-   某首音频缺失时静默跳过，不影响玩法（与 Tex 缺图回退矢量的策略一致）。 */
-import { Node, AudioSource, AudioClip, resources } from 'cc';
+   Bundle 或某首音频缺失时静默跳过，不影响玩法（与 Tex 缺图回退矢量的策略一致）。
+   ⚠ 抖音构建时在构建面板把 audio Bundle 勾选为「子包」。 */
+import { Node, AudioSource, AudioClip, assetManager } from 'cc';
 import { audio } from '../core/audio';
 import { pickBgm, BGM_KEYS } from '../core/bgm';
 
@@ -22,14 +24,17 @@ export function loadBgm(host: Node): void {
   host.addChild(n);
   src = n.addComponent(AudioSource);
   src.playOnAwake = false;
-  let done = 0;
-  for (const k of BGM_KEYS) {
-    resources.load('audio/' + k, AudioClip, (err: any, clip: any) => {
-      if (!err && clip) CLIPS[k] = clip;
-      else console.warn('[Bgm] load fail:', k, err);
-      if (++done === BGM_KEYS.length) console.log('[Bgm] loaded', Object.keys(CLIPS).length, '/', BGM_KEYS.length);
-    });
-  }
+  assetManager.loadBundle('audio', (berr: any, bundle: any) => {
+    if (berr || !bundle) { console.warn('[Bgm] audio bundle load fail:', berr); return; }
+    let done = 0;
+    for (const k of BGM_KEYS) {
+      bundle.load(k, AudioClip, (err: any, clip: any) => {
+        if (!err && clip) CLIPS[k] = clip;
+        else console.warn('[Bgm] load fail:', k, err);
+        if (++done === BGM_KEYS.length) console.log('[Bgm] loaded', Object.keys(CLIPS).length, '/', BGM_KEYS.length);
+      });
+    }
+  });
 }
 
 export function updateBgm(dt: number): void {
@@ -52,14 +57,4 @@ export function updateBgm(dt: number): void {
     }
     src.stop(); curKey = wantKey; vol = 0;
     if (!curKey) return;
-    curLoop = want!.loop;
-    src.clip = CLIPS[curKey];
-    src.loop = curLoop;
-    try { src.play(); } catch (e) {}
-  }
-  if (!curKey) return;
-  // 循环曲被浏览器手势策略拦下时持续补播；单次曲自然播完则不重播
-  if (!src.playing && src.clip && curLoop) { try { src.play(); } catch (e) {} }
-  vol = Math.min(VOL, vol + FADE_IN * dt);
-  src.volume = vol;
-}
+    curLoop = want!.lo
