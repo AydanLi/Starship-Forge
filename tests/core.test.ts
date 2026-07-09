@@ -167,22 +167,14 @@ describe('广告(3 秒模拟)', () => {
 // ---------- 经济:刷新与招募 ----------
 describe('经济', () => {
   beforeEach(() => { forge.reset(); });
-  it('招募:金币足够 → 扣 15 并空降一艘带标签可上阵战舰', () => {
+  // M3:招募改为三选一定向招募,完整用例见 tests/recruit.test.ts
+  it('招募按钮:打开三选一面板而非直接空降', () => {
     G.gold = 20; G.phase = 'PREP';
-    // 走按钮语义:tryPrepClick 命中第二个按钮(招募援军)
     econ.tryPrepClick(C.CT.left + C.EB_W + 6 + 2, C.EB_Y + 2);
-    expect(G.gold).toBe(5);
-    const dep = forge.deployables();
-    expect(dep.length).toBe(1);
-    expect(dep[0].gTier).toBe(C.DEPLOY_MIN);
-    expect(dep[0].fac).toBeGreaterThanOrEqual(0); expect(dep[0].fac).toBeLessThan(4);
-    expect(dep[0].cls).toBeGreaterThanOrEqual(0); expect(dep[0].cls).toBeLessThan(4);
-  });
-  it('招募:金币不足 → 不扣钱不出船', () => {
-    G.gold = 3; G.phase = 'PREP';
-    econ.tryPrepClick(C.CT.left + C.EB_W + 6 + 2, C.EB_Y + 2);
-    expect(G.gold).toBe(3);
+    expect(G.panel).toBe('recruit');
+    expect(G.gold).toBe(20);
     expect(forge.deployables().length).toBe(0);
+    econ.closeRecruit();
   });
   it('刷新队列:扣 8 金币并重抽当前/下一投放', () => {
     G.gold = 10; G.phase = 'PREP'; G.current = { tier: 0, x: 240 };

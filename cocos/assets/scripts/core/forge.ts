@@ -71,11 +71,20 @@ export const forge = {
     b.gTier = tier; b.merging = false; b.overTime = 0; b.born = performance.now();
     b.gStar = (star && star > 1) ? Math.min(star, 3) : 1;
     if (tier >= C.DEPLOY_MIN) {
-      b.fac = (fac === undefined || fac === null) ? rng.int(4) : fac;
-      b.cls = (cls === undefined || cls === null) ? rng.int(4) : cls;
+      b.fac = (fac === undefined || fac === null) ? this.pickTag('fac') : fac;
+      b.cls = (cls === undefined || cls === null) ? this.pickTag('cls') : cls;
     }
     if (vy) M.Body.setVelocity(b, { x: 0, y: vy });
     M.Composite.add(world, b); return b;
+  },
+  /** M3 软权重:已拥有≥SOFT_MIN 个的阵营/舰种,被抽中概率 ×SOFT_W(TFT 商店式,SOFT_W=1 退化纯随机)。 */
+  pickTag(kind: 'fac' | 'cls'): number {
+    const counts = [0, 0, 0, 0];
+    for (const b of this.deployables()) { const v = kind === 'fac' ? b.fac : b.cls; if (v !== undefined) counts[v]++; }
+    const w = counts.map(c => c >= C.SOFT_MIN ? C.SOFT_W : 1);
+    let r = rng.next() * (w[0] + w[1] + w[2] + w[3]);
+    for (let i = 0; i < 4; i++) { r -= w[i]; if (r < 0) return i; }
+    return 3;
   },
   /** 同级合成:星级取两者较高,阵营/舰种继承星级高的一方(平星继承前者)。 */
   mergeBodies(a: any, b: any): any {

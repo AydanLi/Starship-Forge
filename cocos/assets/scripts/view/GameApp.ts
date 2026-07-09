@@ -138,6 +138,7 @@ export class GameApp extends Component {
       this.drawTopHud();
       this.drawFx();
       p.layer(1);
+      if (G.phase === 'PREP' && G.panel === 'recruit') this.drawRecruit();
       if (G.phase === 'RESULT') this.drawResult();
       if (G.phase === 'GAMEOVER') this.drawOver();
       if (G.story) this.drawStory();
@@ -403,6 +404,29 @@ export class GameApp extends Component {
       y += 8;
     }
     p.text('▶ 点击「' + (s.btn || '继续') + '」', C.W / 2, py + ph - 16, 13, '#8fd8ff', 'center', true);
+  }
+  /** M3 三选一定向招募:候选卡弹窗(阵营色描边 + 舰船图 + 标签;选卡时扣费,取消免费) */
+  private drawRecruit(): void {
+    const p = this.p;
+    p.fillRect(0, 0, C.W, C.H, 'rgba(3,6,12,0.82)');
+    p.text(G.recruitFree ? '📺 免费定向招募 · 三选一' : '定向招募 · 三选一（选中扣 ' + C.RECRUIT_COST + '💰）', C.W / 2, 200, 17, '#ffd08a', 'center', true);
+    p.text('至少一张瞄准你当前的羁绊缺口', C.W / 2, 222, 11, '#6f88a8', 'center');
+    const offers = G.recruitOffers || [];
+    C.RC.CARDS.forEach((r: any, i: number) => {
+      const o = offers[i]; if (!o) return;
+      const fc = C.FAC[o.fac].c;
+      p.roundRect(r.x, r.y, r.w, r.h, 12, '#0c1728', fc, 2);
+      const cx = r.x + r.w / 2, cy = r.y + 78, rr = 40;
+      const sf = TEX[shipKey(o.fac, o.tier)];
+      if (sf) { p.circle(cx, cy, rr + 1, 'rgba(4,7,14,0.6)', fc, 2.5); p.img(sf, cx, cy, rr * 2.2, rr * 2.2); }
+      else { p.circle(cx, cy, rr, C.TIERS[o.tier].c, fc, 3); }
+      p.text(C.TIERS[o.tier].name, cx, r.y + 138, 13, '#dfeaf7', 'center', true);
+      p.text(C.FAC[o.fac].name + ' · ' + C.CLS[o.cls].name, cx, r.y + 158, 12, fc, 'center', true);
+      p.text(G.recruitFree ? '免费入列 ▶' : C.RECRUIT_COST + '💰 入列 ▶', cx, r.y + 180, 11, '#8fd8ff', 'center');
+    });
+    const cb = C.RC.CANCEL;
+    p.roundRect(cb.x, cb.y, cb.w, cb.h, 10, '#101d33', '#5f7797', 1.5);
+    p.text('先不招（不花钱）', cb.x + cb.w / 2, cb.y + 27, 13, '#8fb4d6', 'center', true);
   }
   /** 新手指引提示卡（轻量气泡：不遮屏不锁操作） */
   private drawTutorial(): void {

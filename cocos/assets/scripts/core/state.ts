@@ -10,7 +10,8 @@ export const G: any = {
   nextTier: 0, canDrop: false, over: false, overHandled: false,
   // 进度
   score: 0, gold: 0, level: 0, wave: 0, bestTier: 0, maxLevel: 0, seed: 0,
-  panel: null as null | 'settings',
+  panel: null as null | 'settings' | 'recruit',
+  recruitOffers: null as any[] | null, recruitFree: false,
   pendingName: '',          // 登录页正在输入的代号
   // 编队
   slots: [null, null, null, null, null, null] as any[],
@@ -41,6 +42,7 @@ export function resetG(): void {
   G.story = null; G.storyQueue = [];
   G.lastGain = 0; G.goldDoubled = true; G.overloadBoost = false;
   G.deployedSnapshot = null; G.pendingForge = null;
+  G.recruitOffers = null; G.recruitFree = false;
   G.lastSalvage = 0; G.lastLost = 0; G.lastReturned = 0;
   G.nextTier = pickDropTier();
 }

@@ -90,7 +90,7 @@ export function onFire(): void {
   if (G.phase === 'LOGIN') menu.confirmLogin(false);
   else if (G.phase === 'MENU') { if (G.panel) menu.closeSettings(); else startGame(); }
   else if (G.phase === 'MAP') menu.toMenu();
-  else if (G.phase === 'PREP') board.enter();
+  else if (G.phase === 'PREP') { if (G.panel === 'recruit') econ.closeRecruit(); else board.enter(); }
   else if (G.phase === 'DEPLOY') battle.start();
   else if (G.phase === 'BATTLE') battle.tactical();
   else if (G.phase === 'RESULT') { G.result === 'win' ? nextAfterWin() : retryWave(); }
@@ -129,7 +129,7 @@ export function uiModel(): UiModel {
     case 'LOGIN': return { fire: '🚀 进入舰桥', fireOn: true, reset: '游客进入', resetOn: true, hint: G.hint };
     case 'MENU': return { fire: G.panel ? '关闭设置' : '▶ 开始游戏', fireOn: true, reset: '⚙ 系统设置', resetOn: true, hint: G.hint };
     case 'MAP': return { fire: '← 返回主界面', fireOn: true, reset: '—', resetOn: false, hint: G.hint };
-    case 'PREP': { const n = forge.deployables().length; return { fire: '编队部署（' + n + '）', fireOn: n > 0, reset: '重新开始', resetOn: true, hint: G.hint }; }
+    case 'PREP': { if (G.panel === 'recruit') return { fire: '关闭招募面板', fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint }; const n = forge.deployables().length; return { fire: '编队部署（' + n + '）', fireOn: n > 0, reset: '重新开始', resetOn: true, hint: G.hint }; }
     case 'DEPLOY': { const m = G.slots.filter(Boolean).length; return { fire: '⚔ 开战（' + m + '）', fireOn: m > 0, reset: '重新开始', resetOn: true, hint: G.hint }; }
     case 'BATTLE': return { fire: G.tacticalReady ? '⚡ 战术技·全体齐射' : '战术技冷却 ' + Math.ceil(G.tacticalCd) + 's', fireOn: G.tacticalReady, reset: '重新开始', resetOn: true, hint: G.hint };
     case 'RESULT': return G.result === 'win'
@@ -164,6 +164,7 @@ export function pointerDown(px: number, py: number): void {
   if (G.phase === 'LOGIN' || G.phase === 'MENU' || G.phase === 'MAP') { menu.click(px, py); return; }
   if (G.phase === 'RESULT') { econ.tryResultClick(px, py); return; }
   if (G.phase === 'PREP') {
+    if (G.panel === 'recruit') { econ.recruitClick(px, py); return; }   // M3:候选面板拦截输入
     if (econ.tryPrepClick(px, py)) return;
     if (G.current) { G.current.x = px; forge.drop(); }
   } else if (G.phase === 'DEPLOY') board.dragStart(px, py);

@@ -33,6 +33,13 @@ export const C = {
   },
   /* M2 跨波舰队:阵亡残骸回收率 / 船坞容量(单次回流上限) / 超限折价率 */
   SALVAGE_RATE: 0.3, DOCK_CAP: 10, DOCK_OVER_RATE: 0.6,
+  /* M3 构筑可控:软权重(已拥有≥SOFT_MIN 个的阵营/舰种,抽中权重×SOFT_W;设 1 退化为纯随机)
+     招募候选:三选一,RECRUIT_T2_P 概率出 6 级(否则 5 级);候选卡/取消按钮命中区(供 core 与视图共用) */
+  SOFT_W: 2.0, SOFT_MIN: 2, RECRUIT_T2_P: 0.25,
+  RC: {
+    CARDS: [{ x: 30, y: 236, w: 130, h: 190 }, { x: 175, y: 236, w: 130, h: 190 }, { x: 320, y: 236, w: 130, h: 190 }],
+    CANCEL: { x: 150, y: 448, w: 180, h: 42 }
+  },
   REFRESH_COST: 8, RECRUIT_COST: 15,
   AD_SECONDS: 3,
   SLOTC: [{ x: 138, y: 300 }, { x: 240, y: 300 }, { x: 342, y: 300 },
