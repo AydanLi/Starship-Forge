@@ -44,6 +44,13 @@ export const fleet = {
     if (!keepFront) { alive.sort((a, b) => b.maxHp - a.maxHp); const fn = Math.max(1, Math.ceil(alive.length / 2)); alive.forEach((u, i) => u.front = i < fn); }
     const rowY = isEnemy ? { front: 258, back: 176 } : { front: 470, back: 560 };
     const place = (list: any[], y: number) => { const k = list.length, x0 = C.CT.left + 42, x1 = C.CT.right - 42; list.forEach((u, i) => { u.x = k === 1 ? C.W / 2 : x0 + (x1 - x0) * i / (k - 1); u.y = y; }); };
+    // Boss 波:Boss 大立绘居中偏上压场,护卫一字排开在其身前(仅视觉排布;front 标记与寻敌逻辑不变)
+    const boss = isEnemy ? alive.find(u => u.isBoss) : undefined;
+    if (boss) {
+      boss.x = C.W / 2; boss.y = 208;
+      place(alive.filter(u => u !== boss), 288);
+      return;
+    }
     place(alive.filter(u => u.front), rowY.front); place(alive.filter(u => !u.front), rowY.back);
   }
 };

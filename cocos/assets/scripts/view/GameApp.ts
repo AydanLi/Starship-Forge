@@ -27,6 +27,8 @@ const BTN_FIRE = { x: 24, y: 772, w: 250, h: 50 };
 const BTN_RESET = { x: 286, y: 772, w: 116, h: 50 };
 const BTN_MUTE = { x: 414, y: 772, w: 42, h: 50 };
 const BTN_HOME = { x: 14, y: 8, w: 82, h: 30 };   // 左上角「返回主界面」（仅对局中显示）
+// 战场背景压暗系数(按星区):虫巢(s3)背景与虫族同色系,压得更深让单位跳出来
+const ARENA_DIM = [0.42, 0.44, 0.58, 0.5, 0.42];
 
 @ccclass('GameApp')
 export class GameApp extends Component {
@@ -125,7 +127,7 @@ export class GameApp extends Component {
       const arenaBg = TEX[bgKey(G.level)];
       if (arenaBg) {
         p.bgImg(arenaBg, 0, 0, 480, 840);
-        p.fillRect(-12, -12, C.W + 24, C.H + 24, 'rgba(4,8,16,0.42)');   // 压暗保证可读性
+        p.fillRect(-12, -12, C.W + 24, C.H + 24, 'rgba(4,8,16,' + ARENA_DIM[Math.min(G.level, 4)] + ')');   // 按星区压暗保证可读性
       } else {
         p.fillRect(-12, -12, C.W + 24, C.H + 24, '#070c16');
         this.drawGrid();
@@ -257,10 +259,18 @@ export class GameApp extends Component {
     const isBoss = G.wave === C.WAVES_PER_LEVEL - 1;
     p.text(isBoss ? '⚠ 本波：星区 Boss！' : '下一波敌情：普通编队', C.CT.left, 92, 12, '#ff8a9c', 'left', true);
     let ex = C.CT.left;
+    const pvBoss = TEX[bossKey(G.level)], pvEnemy = TEX[enemyKey(G.level)];
     for (const e of fleet.genEnemiesPreview(G.level, G.wave)) {
-      const s = e.boss ? 16 : 9;
-      p.poly([{ x: ex + s, y: 104 }, { x: ex + s * 2, y: 104 - s }, { x: ex, y: 104 - s }], e.boss ? '#ff3b5c' : '#ff6a6a');
-      ex += s * 2 + 8;
+      const s = e.boss ? 21 : 13;
+      const sf = e.boss ? pvBoss : pvEnemy;
+      const cx = ex + s, cy = 116;
+      if (sf) {   // 缩小的真实模型(贴图未就绪时回退三角占位)
+        p.circle(cx, cy, s + 2, 'rgba(4,7,14,0.62)', e.boss ? '#ff3b5c' : '#ff7585', e.boss ? 2.5 : 1.5);
+        p.img(sf, cx, cy, s * 2.2, s * 2.2);
+      } else {
+        p.poly([{ x: cx, y: cy + s }, { x: cx + s, y: cy - s * 0.7 }, { x: cx - s, y: cy - s * 0.7 }], e.boss ? '#ff3b5c' : '#ff6a6a');
+      }
+      ex += s * 2 + 10;
     }
     p.text('前排（近敌·扛伤）', C.W / 2, 250, 11, '#5f7797', 'center');
     p.text('后排（受保护·输出）', C.W / 2, 452, 11, '#5f7797', 'center');
@@ -303,15 +313,17 @@ export class GameApp extends Component {
   }
   private drawUnit(u: any): void {
     const p = this.p;
-    const enemy = u.team === 'e', r = u.isBoss ? 40 : (u.summon ? 14 : 16 + u.tier * 1.6);
+    const enemy = u.team === 'e', r = u.isBoss ? 52 : (u.summon ? 14 : 16 + u.tier * 1.6);
     const col = enemy ? (u.isBoss ? '#ff3b5c' : '#ff6a6a') : C.FAC[u.fac].c;
     const bossSf = TEX[bossKey(G.level)];
     const enemySf = TEX[enemyKey(G.level)];
     const shipSf = (!enemy && !u.summon) ? TEX[shipKey(u.fac, u.tier)] : (!enemy && u.summon ? TEX[shipKey(u.fac, 4)] : undefined);
     if (enemy && u.isBoss && bossSf) {
-      p.img(bossSf, u.x, u.y, r * 2.4, r * 2.4);
+      // Boss:暗底光环 + 大立绘,居中压场
+      p.circle(u.x, u.y, r + 8, 'rgba(3,5,10,0.5)', '#ff3b5c', 3, 0.92);
+      p.img(bossSf, u.x, u.y, r * 2.5, r * 2.5);
     } else if (enemy && enemySf) {
-      p.circle(u.x, u.y, r + 1, undefined, '#ff5a6e', 2);   // 红环标识敌方
+      p.circle(u.x, u.y, r + 2, 'rgba(4,7,14,0.62)', '#ff7585', 2.5);   // 暗底+亮红环:低对比场景(虫巢等)也能看清
       p.img(enemySf, u.x, u.y, r * 2.2, r * 2.2);
     } else if (enemy) {
       p.poly([{ x: u.x, y: u.y + r }, { x: u.x + r, y: u.y - r * 0.7 }, { x: u.x - r, y: u.y - r * 0.7 }], col, '#ffffffbb', 1.5);
@@ -328,7 +340,10 @@ export class GameApp extends Component {
     p.fillRect(bx, by, bw, 5, '#0c1424');
     p.fillRect(bx, by, bw * clamp(u.hp / u.maxHp, 0, 1), 5, enemy ? '#ff4d6a' : '#49e08a');
     if (u.shield > 0) p.fillRect(bx, by - 3, bw * clamp(u.shield / u.maxHp, 0, 1), 2, '#7cf3ff');
-    if (!u.summon) p.text(u.isBoss ? u.name : (enemy ? '敌舰' : C.FAC[u.fac].name + C.CLS[u.cls].name), u.x, u.y + r + 12, 9, enemy ? '#ffb0bb' : '#dfeaf7', 'center');
+    if (!u.summon) {
+      if (u.isBoss) p.text(u.name, u.x, u.y - r - 24, 13, '#ff8a9c', 'center', true);   // Boss 名号在血条上方,加大加粗
+      else p.text(enemy ? '敌舰' : C.FAC[u.fac].name + C.CLS[u.cls].name, u.x, u.y + r + 12, 9, enemy ? '#ffb0bb' : '#dfeaf7', 'center');
+    }
   }
 
   private drawFx(): void {
