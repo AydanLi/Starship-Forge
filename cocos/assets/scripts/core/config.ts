@@ -36,6 +36,16 @@ export const C = {
   /* M3 构筑可控:软权重(已拥有≥SOFT_MIN 个的阵营/舰种,抽中权重×SOFT_W;设 1 退化为纯随机)
      招募候选:三选一,RECRUIT_T2_P 概率出 6 级(否则 5 级);候选卡/取消按钮命中区(供 core 与视图共用) */
   SOFT_W: 2.0, SOFT_MIN: 2, RECRUIT_T2_P: 0.25,
+  /* M4 Boss 机制(按星区索引,声明式;battle.ts 通用 handler 解释执行)。
+     每个机制都是「战术技时机」的考题:留技清场/破盾窗口/攒队清潮/压制抢拍/抢在斩杀前爆发 */
+  BOSS_SKILLS: [
+    { type: 'summon',  threshold: 0.5, count: 2, warn: '召唤护卫' },     // S1 秃鹫号:半血一次性召唤
+    { type: 'shield',  interval: 8, value: 800, warn: '充能护盾' },      // S2 铁卫:周期护盾
+    { type: 'hatch',   interval: 6, count: 2, warn: '孵化虫群' },        // S3 虫族女皇:持续孵化(弱化体)
+    { type: 'silence', interval: 10, duration: 4, warn: '信号压制' },    // S4 零号意志:锁战术技
+    { type: 'snipe',   interval: 7, mult: 3.0, warn: '锁定齐射' }        // S5 万王之王:点名前排
+  ] as any[],
+  BOSS_WARN: 1.0,   // 施放前预警秒数(黄圈闪烁 + 飘字)
   RC: {
     CARDS: [{ x: 30, y: 236, w: 130, h: 190 }, { x: 175, y: 236, w: 130, h: 190 }, { x: 320, y: 236, w: 130, h: 190 }],
     CANCEL: { x: 150, y: 448, w: 180, h: 42 }

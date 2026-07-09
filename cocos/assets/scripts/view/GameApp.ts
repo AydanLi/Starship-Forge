@@ -320,8 +320,9 @@ export class GameApp extends Component {
     const enemySf = TEX[enemyKey(G.level)];
     const shipSf = (!enemy && !u.summon) ? TEX[shipKey(u.fac, u.tier)] : (!enemy && u.summon ? TEX[shipKey(u.fac, 4)] : undefined);
     if (enemy && u.isBoss && bossSf) {
-      // Boss:暗底光环 + 大立绘,居中压场
+      // Boss:暗底光环 + 大立绘,居中压场;技能预警时黄圈闪烁(M4)
       p.circle(u.x, u.y, r + 8, 'rgba(3,5,10,0.5)', '#ff3b5c', 3, 0.92);
+      if (u.warnOn && u.warnT > 0) p.circle(u.x, u.y, r + 16, undefined, '#ffd54a', 3.5, 0.45 + 0.5 * Math.abs(Math.sin(G.battleTime * 9)));
       p.img(bossSf, u.x, u.y, r * 2.5, r * 2.5);
     } else if (enemy && enemySf) {
       p.circle(u.x, u.y, r + 2, 'rgba(4,7,14,0.62)', '#ff7585', 2.5);   // 暗底+亮红环:低对比场景(虫巢等)也能看清

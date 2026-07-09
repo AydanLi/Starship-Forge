@@ -2,6 +2,7 @@
    matter.min.js 以插件脚本加载，提供全局 Matter（见 globals.d.ts）。 */
 import { C, clamp, pickDropTier } from './config';
 import { rng } from './rng';
+import { SavedShip, packShip, unpackShip } from './types';
 import { G } from './state';
 import { fx } from './fx';
 import { audio } from './audio';
@@ -108,17 +109,18 @@ export const forge = {
     const x = rng.range(C.CT.left + r + 6, C.CT.right - r - 6);
     return this.addBall(tier, x, C.Y_DROP, 0.5, fac, cls, star);
   },
-  /** 熔炉快照(存档用):全部玩法刚体的 等级/标签/星级/横坐标。 */
-  snapshot(): { t: number, f?: number, c?: number, s: number, x: number }[] {
+  /** 熔炉快照(存档用)。缩写字段是既有存档格式,统一经 types.packShip 编码。 */
+  snapshot(): SavedShip[] {
     return this.bodies().filter((b: any) => b.gTier !== undefined)
-      .map((b: any) => ({ t: b.gTier, f: b.fac, c: b.cls, s: b.gStar || 1, x: Math.round(b.position.x) }));
+      .map((b: any) => packShip(b.gTier, b.fac, b.cls, b.gStar || 1, Math.round(b.position.x)));
   },
-  /** 按快照恢复熔炉(续档/失败还原)。 */
-  restore(list: { t: number, f?: number, c?: number, s?: number, x?: number }[]): void {
+  /** 按快照恢复熔炉(续档/失败还原),经 types.unpackShip 解码为全名四元组。 */
+  restore(list: SavedShip[]): void {
     for (const it of (list || [])) {
-      const r = C.TIERS[it.t] ? C.TIERS[it.t].r : 15;
-      const x = clamp(it.x === undefined ? C.W / 2 : it.x, C.CT.left + r + 1, C.CT.right - r - 1);
-      this.addBall(it.t, x, C.Y_DROP, 0.4, it.f, it.c, it.s);
+      const sv = unpackShip(it);
+      const r = C.TIERS[sv.tier] ? C.TIERS[sv.tier].r : 15;
+      const x = clamp(sv.x === undefined ? C.W / 2 : sv.x, C.CT.left + r + 1, C.CT.right - r - 1);
+      this.addBall(sv.tier, x, C.Y_DROP, 0.4, sv.fac, sv.cls, sv.star);
     }
   },
   removeBody(b: any): void { Matter.Composite.remove(world, b); },

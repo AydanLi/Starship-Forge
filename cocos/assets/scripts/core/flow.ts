@@ -131,7 +131,10 @@ export function uiModel(): UiModel {
     case 'MAP': return { fire: '← 返回主界面', fireOn: true, reset: '—', resetOn: false, hint: G.hint };
     case 'PREP': { if (G.panel === 'recruit') return { fire: '关闭招募面板', fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint }; const n = forge.deployables().length; return { fire: '编队部署（' + n + '）', fireOn: n > 0, reset: '重新开始', resetOn: true, hint: G.hint }; }
     case 'DEPLOY': { const m = G.slots.filter(Boolean).length; return { fire: '⚔ 开战（' + m + '）', fireOn: m > 0, reset: '重新开始', resetOn: true, hint: G.hint }; }
-    case 'BATTLE': return { fire: G.tacticalReady ? '⚡ 战术技·全体齐射' : '战术技冷却 ' + Math.ceil(G.tacticalCd) + 's', fireOn: G.tacticalReady, reset: '重新开始', resetOn: true, hint: G.hint };
+    case 'BATTLE': {
+      if (G.tacticalLocked > 0) return { fire: '⚠ 战术技被压制 ' + Math.ceil(G.tacticalLocked) + 's', fireOn: false, reset: '重新开始', resetOn: true, hint: G.hint };
+      return { fire: G.tacticalReady ? '⚡ 战术技·全体齐射' : '战术技冷却 ' + Math.ceil(G.tacticalCd) + 's', fireOn: G.tacticalReady, reset: '重新开始', resetOn: true, hint: G.hint };
+    }
     case 'RESULT': return G.result === 'win'
       ? { fire: (G.wave === C.WAVES_PER_LEVEL - 1 ? '进入下一星区 ▶' : '下一波 ▶'), fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint }
       : { fire: '重试本波 ↻', fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint };
