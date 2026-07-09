@@ -6,7 +6,16 @@ import { Node, Graphics, Label, Color, UITransform, Layers, Sprite, SpriteFrame 
 export const DESIGN_W = 480;
 export const DESIGN_H = 840;   // 760 游戏区 + 80 底部按钮条
 
+const colorCache = new Map<string, Color>();
 function parseColor(s: string, alpha: number): Color {
+  const key = s + '|' + alpha;
+  const hit = colorCache.get(key);
+  if (hit) return hit;
+  const c = parseColorRaw(s, alpha);
+  if (colorCache.size < 512) colorCache.set(key, c);   // 上限防动态色串撑爆
+  return c;
+}
+function parseColorRaw(s: string, alpha: number): Color {
   let r = 255, g = 255, b = 255, a = 255;
   if (s.startsWith('#')) {
     const hex = s.slice(1);
@@ -163,7 +172,7 @@ export class Painter {
   img(sf: SpriteFrame, cx: number, cy: number, w: number, h: number, alpha = 1): void {
     const s = this.cur.sprite();
     if (s.spriteFrame !== sf) s.spriteFrame = sf;
-    s.color = new Color(255, 255, 255, Math.round(255 * alpha));
+    s.color = parseColor('#ffffff', alpha);
     s.node.getComponent(UITransform)!.setContentSize(w, h);
     s.node.setPosition(this.tx(cx), this.ty(cy), 0);
   }
@@ -171,7 +180,7 @@ export class Painter {
   bgImg(sf: SpriteFrame, x: number, y: number, w: number, h: number, alpha = 1): void {
     const s = this.cur.bgSprite();
     if (s.spriteFrame !== sf) s.spriteFrame = sf;
-    s.color = new Color(255, 255, 255, Math.round(255 * alpha));
+    s.color = parseColor('#ffffff', alpha);
     s.node.getComponent(UITransform)!.setContentSize(w, h);
     s.node.setPosition(this.tx(x + w / 2), this.ty(y + h / 2), 0);
   }

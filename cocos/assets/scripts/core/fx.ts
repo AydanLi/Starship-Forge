@@ -24,7 +24,8 @@ export const fx = {
     _shake = 0; return { sx: 0, sy: 0 };
   },
   update(dt: number): void {
-    for (const p of _particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= dt * 1.6; }
+    const k = dt * 60;   // 60fps 基准:高刷屏上粒子速度不再翻倍
+    for (const p of _particles) { p.x += p.vx * k; p.y += p.vy * k; p.vy += 0.15 * k; p.life -= dt * 1.6; }
     _particles = _particles.filter(p => p.life > 0);
     for (const b of _beams) b.life -= dt * 2.2; _beams = _beams.filter(b => b.life > 0);
     for (const f of _floats) { f.y -= 14 * dt; f.life -= dt * 0.9; } _floats = _floats.filter(f => f.life > 0);

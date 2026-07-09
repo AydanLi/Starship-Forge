@@ -9,6 +9,9 @@ import { setHint } from './state';
 
 let engine: any = null, world: any = null;
 let mergeQueue: any[][] = [];
+// 帧率无关化:物理固定步长累加器 / 模拟时钟(替代 performance.now) / 投放重生计时(替代 setTimeout)
+const PHYS_STEP = 1 / 60;
+let phAcc = 0, simTime = 0, respawnT = -1;
 let uiDirty = () => {};   // 由 flow 注入，替代原 SF.ui.update()
 
 export function bindUiDirty(f: () => void) { uiDirty = f; }
@@ -27,7 +30,7 @@ function processMerges() {
 function checkOverflow(dt: number) {
   const M = Matter;
   for (const b of M.Composite.allBodies(world)) {
-    if (b.gTier === undefined || performance.now() - b.born < 400) continue;
+    if (b.gTier === undefined || simTime - b.born < 0.4) continue;
     if (b.position.y - b.circleRadius < C.Y_WARN && b.speed < 1.3) b.overTime += dt; else b.overTime = 0;
     if (b.overTime > C.OVER_LIMIT) {
       G.phase = 'GAMEOVER'; G.over = true; G.current = null;
@@ -50,7 +53,7 @@ export const forge = {
       M.Bodies.rectangle(C.CT.right + t / 2, (C.CT.top + C.CT.floor) / 2, t, (C.CT.floor - C.CT.top) + 200, o)
     ]);
     M.Events.on(engine, 'collisionStart', onCollide);
-    mergeQueue = [];
+    mergeQueue = []; phAcc = 0; respawnT = -1;
   },
   spawnCurrent(): void {
     const t = G.nextTier; G.nextTier = pickDropTier();
@@ -62,13 +65,13 @@ export const forge = {
     this.addBall(G.current.tier, clamp(G.current.x, C.CT.left + r + 1, C.CT.right - r - 1), C.Y_DROP, 0.5);
     audio.play('drop');
     G.current = null; G.canDrop = false;
-    setTimeout(() => { if (!G.over && G.phase === 'PREP') forge.spawnCurrent(); }, 420);
+    respawnT = 0.42;   // 游戏循环内计时:随广告/剧情自然暂停,且可确定性回放
   },
   /** 投放刚体。fac/cls/star 可选:招募/回流/续档恢复时指定标签,普通投放随机。 */
   addBall(tier: number, x: number, y: number, vy?: number, fac?: number, cls?: number, star?: number): any {
     const M = Matter, r = C.TIERS[tier].r;
     const b = M.Bodies.circle(x, y, r, { restitution: 0.08, friction: 0.4, frictionStatic: 0.6, density: 0.001, slop: 0.02 });
-    b.gTier = tier; b.merging = false; b.overTime = 0; b.born = performance.now();
+    b.gTier = tier; b.merging = false; b.overTime = 0; b.born = simTime;
     b.gStar = (star && star > 1) ? Math.min(star, 3) : 1;
     if (tier >= C.DEPLOY_MIN) {
       b.fac = (fac === undefined || fac === null) ? this.pickTag('fac') : fac;
@@ -121,5 +124,12 @@ export const forge = {
   removeBody(b: any): void { Matter.Composite.remove(world, b); },
   bodies(): any[] { return world ? Matter.Composite.allBodies(world) : []; },
   deployables(): any[] { return this.bodies().filter((b: any) => b.gTier >= C.DEPLOY_MIN); },
-  update(dt: number): void { Matter.Engine.update(engine, 1000 / 60); processMerges(); checkOverflow(dt); }
+  update(dt: number): void {
+    simTime += dt;
+    // 固定步长:物理速度与刷新率无关(120Hz 真机不再 2 倍速);上限防「死亡螺旋」
+    phAcc = Math.min(phAcc + dt, 0.25);
+    while (phAcc >= PHYS_STEP) { Matter.Engine.update(engine, 1000 * PHYS_STEP); phAcc -= PHYS_STEP; }
+    if (respawnT > 0) { respawnT -= dt; if (respawnT <= 0) { respawnT = -1; if (!G.over && G.phase === 'PREP' && !G.current) this.spawnCurrent(); } }
+    processMerges(); checkOverflow(dt);
+  }
 };
