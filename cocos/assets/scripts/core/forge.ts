@@ -36,7 +36,7 @@ function checkOverflow(dt: number) {
     if (b.overTime > C.OVER_LIMIT) {
       G.phase = 'GAMEOVER'; G.over = true; G.current = null;
       audio.play('overload');
-      uiDirty(); setHint('熔炉过载！点击「重新开始」'); return;
+      uiDirty(); setHint('熔炉过载！舰队全灭——「重开本波」原地再来，或返回主界面'); return;
     }
   }
 }

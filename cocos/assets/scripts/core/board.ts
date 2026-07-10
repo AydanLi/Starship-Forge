@@ -24,7 +24,7 @@ export const board = {
     if (G.phase !== 'PREP') return;
     const dep = forge.deployables();
     if (!dep.length) { flashHint('还没有可上阵的战舰（需合成到5级“攻击无人机”以上）'); return; }
-    let toks = dep.map((b: any) => ({ tier: b.gTier, fac: b.fac, cls: b.cls, star: 1, bodies: [b], x: 0, y: 0 }));
+    let toks = dep.map((b: any) => ({ tier: b.gTier, fac: b.fac, cls: b.cls, star: b.gStar || 1, bodies: [b], x: 0, y: 0 }));   // M2:星级随刚体保留(回流的 2 星舰再上阵仍是 2 星)
     toks.sort((a: any, b: any) => b.tier - a.tier);
     G.slots = [null, null, null, null, null, null]; G.bench = [];
     toks.forEach((t: any, i: number) => { if (i < 6) G.slots[i] = t; else G.bench.push(t); });

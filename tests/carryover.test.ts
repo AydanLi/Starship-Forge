@@ -9,6 +9,7 @@ import { fleet } from '../cocos/assets/scripts/core/fleet';
 import { save } from '../cocos/assets/scripts/core/save';
 import { user } from '../cocos/assets/scripts/core/user';
 import { menu } from '../cocos/assets/scripts/core/menu';
+import { board } from '../cocos/assets/scripts/core/board';
 import * as flow from '../cocos/assets/scripts/core/flow';
 
 const tok = (tier: number, star: number, fac: number, cls: number) =>
@@ -142,6 +143,54 @@ describe('敌方强度数据化(config.ENEMY)', () => {
     expect(arr[0].isBoss).toBe(true);
     expect(arr[0].maxHp).toBeCloseTo(E.bossHp * (1 + E.bossHpLv * 1));
     expect(arr[1].maxHp).toBeCloseTo(E.minHp * (1 + E.minLv * 1));
+  });
+});
+
+describe('局内「重新开始」= 只重置本波(回归修复:原先误接 freshRun 清空总进度)', () => {
+  it('战斗中重来:星区/波次/金币/分数保留,开战阵容原样回炉', () => {
+    G.level = 2; G.wave = 3; G.gold = 77; G.score = 900;
+    fight([tok(6, 2, 1, 1), tok(5, 1, 0, 0)]);
+    flow.restartWave();
+    expect(G.phase).toBe('PREP');
+    expect(G.level).toBe(2); expect(G.wave).toBe(3);
+    expect(G.gold).toBe(77); expect(G.score).toBe(900);
+    const dep = forge.deployables().sort((a: any, b: any) => a.gTier - b.gTier);
+    expect(dep.length).toBe(2);
+    expect(dep[1].gTier).toBe(6); expect(dep[1].gStar).toBe(2);
+    expect(G.deployedSnapshot).toBeNull();
+  });
+  it('编队中「返回备战」:刚体未离炉,清空阵位即可;星级随刚体保留', () => {
+    G.level = 1; G.wave = 2;
+    forge.addBall(6, 240, 300, 0, 1, 1, 2);
+    G.phase = 'PREP';
+    board.enter();
+    expect(G.phase).toBe('DEPLOY');
+    expect((G.slots.find(Boolean) as any).star).toBe(2);   // 回流的 2 星舰再上阵仍是 2 星
+    flow.restartWave();
+    expect(G.phase).toBe('PREP');
+    expect(G.level).toBe(1); expect(G.wave).toBe(2);
+    expect(forge.deployables().length).toBe(1);
+    expect(G.slots.filter(Boolean).length).toBe(0);
+  });
+  it('过载 GAMEOVER 后「重开本波」:进度保留,熔炉按规则为空', () => {
+    G.level = 3; G.wave = 1; G.gold = 50;
+    forge.addBall(7, 240, 300, 0, 0, 0, 2);
+    G.phase = 'GAMEOVER'; G.over = true; G.overHandled = false;
+    flow.step(0.016);                                      // 过载结算:清炉+落档
+    flow.restartWave();
+    expect(G.phase).toBe('PREP');
+    expect(G.level).toBe(3); expect(G.wave).toBe(1); expect(G.gold).toBe(50);
+    expect(forge.deployables().length).toBe(0);
+    expect(G.over).toBe(false);
+  });
+  it('胜利结算界面不可重来(防奖励重复结算)', () => {
+    fight([tok(6, 1, 0, 0)]);
+    G.eUnits.forEach((e: any) => { e.alive = false; });
+    battle.end('win');
+    const gold = G.gold;
+    flow.restartWave();
+    expect(G.phase).toBe('RESULT');
+    expect(G.gold).toBe(gold);
   });
 });
 

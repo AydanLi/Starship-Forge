@@ -42,6 +42,8 @@ export function startGame(): void {
   if (G.level > 0 || G.wave > 0 || G.gold > 0 || G.score > 0) launch({});
   else { G.seed = seedRng(); launch({ intro: true }); }   // 新征程 → 新 seed（续档时 seed 已在 loadProfile 恢复）
 }
+/** 全新征程(清档重来)。注意:不接任何局内按钮——局内「重新开始」只重置本波(restartWave);
+    清空总进度的唯一入口是 主界面 → 系统设置 → 清除存档。 */
 export function freshRun(): void {
   save.clear();
   G.level = 0; G.wave = 0; G.gold = 0; G.score = 0; G.bestTier = 0; G.maxLevel = 0;
@@ -72,6 +74,20 @@ export function retryWave(): void {
   G.deployedSnapshot = null;
   toPrep('备战：舰队已回炉，重整旗鼓再战');
 }
+/** 重新开始本波(修复:原局内「重新开始」误接 freshRun,一键清空总进度)。
+    星区/波次/金币/分数全部保留:编队或战斗中的舰队原样回炉,回到本波备战;
+    过载全灭(GAMEOVER)时舰队已依规清空,以空熔炉在本波原地重开。 */
+export function restartWave(): void {
+  if (G.phase === 'GAMEOVER') { launch({}); return; }
+  if (G.phase === 'RESULT') { if (G.result === 'lose') retryWave(); return; }   // 胜利界面无本波可重来(防奖励重复结算)
+  // DEPLOY:刚体从未离开熔炉,清空阵位即可;BATTLE:开战阵容按快照回炉
+  if (G.deployedSnapshot && G.deployedSnapshot.length) {
+    for (const sp of G.deployedSnapshot) forge.returnShip(sp.tier, sp.fac, sp.cls, sp.star);
+    G.deployedSnapshot = null;
+  }
+  G.dragging = null; G.tacticalLocked = 0; fx.clear();
+  toPrep('本波重置：舰队已回炉，重整旗鼓再战');
+}
 
 export function boot(): void {
   // 系统间回调接线（替代 web 版的 SF 全局查找）
@@ -98,10 +114,11 @@ export function onFire(): void {
 }
 export function onReset(): void {
   if (ads.active()) return;
+  if (G.story) return;                                  // 剧情面板期间不响应(按钮已禁用)
   if (G.phase === 'LOGIN') menu.confirmLogin(true);
   else if (G.phase === 'MENU') menu.openSettings();
-  else if (G.phase === 'MAP') return;
-  else freshRun();
+  else if (G.phase === 'DEPLOY' || G.phase === 'BATTLE' || G.phase === 'RESULT' || G.phase === 'GAMEOVER') restartWave();
+  // MAP/PREP:该键无功能(uiModel 已禁用)
 }
 
 /** 从进行中的对局返回主界面：先落盘当前进度（星区/波/金币/分数），再回主菜单。
@@ -124,21 +141,21 @@ export function toMenu(): void {
 export interface UiModel { fire: string, fireOn: boolean, reset: string, resetOn: boolean, hint: string }
 export function uiModel(): UiModel {
   if (ads.active()) return { fire: '📺 广告播放中…', fireOn: false, reset: '—', resetOn: false, hint: G.hint };
-  if (G.story) return { fire: '▶ ' + (G.story.btn || '继续'), fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint };
+  if (G.story) return { fire: '▶ ' + (G.story.btn || '继续'), fireOn: true, reset: '—', resetOn: false, hint: G.hint };
   switch (G.phase as string) {
     case 'LOGIN': return { fire: '🚀 进入舰桥', fireOn: true, reset: '游客进入', resetOn: true, hint: G.hint };
     case 'MENU': return { fire: G.panel ? '关闭设置' : '▶ 开始游戏', fireOn: true, reset: '⚙ 系统设置', resetOn: true, hint: G.hint };
     case 'MAP': return { fire: '← 返回主界面', fireOn: true, reset: '—', resetOn: false, hint: G.hint };
-    case 'PREP': { if (G.panel === 'recruit') return { fire: '关闭招募面板', fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint }; const n = forge.deployables().length; return { fire: '编队部署（' + n + '）', fireOn: n > 0, reset: '重新开始', resetOn: true, hint: G.hint }; }
-    case 'DEPLOY': { const m = G.slots.filter(Boolean).length; return { fire: '⚔ 开战（' + m + '）', fireOn: m > 0, reset: '重新开始', resetOn: true, hint: G.hint }; }
+    case 'PREP': { if (G.panel === 'recruit') return { fire: '关闭招募面板', fireOn: true, reset: '—', resetOn: false, hint: G.hint }; const n = forge.deployables().length; return { fire: '编队部署（' + n + '）', fireOn: n > 0, reset: '—', resetOn: false, hint: G.hint }; }
+    case 'DEPLOY': { const m = G.slots.filter(Boolean).length; return { fire: '⚔ 开战（' + m + '）', fireOn: m > 0, reset: '↩ 返回备战', resetOn: true, hint: G.hint }; }
     case 'BATTLE': {
-      if (G.tacticalLocked > 0) return { fire: '⚠ 战术技被压制 ' + Math.ceil(G.tacticalLocked) + 's', fireOn: false, reset: '重新开始', resetOn: true, hint: G.hint };
-      return { fire: G.tacticalReady ? '⚡ 战术技·全体齐射' : '战术技冷却 ' + Math.ceil(G.tacticalCd) + 's', fireOn: G.tacticalReady, reset: '重新开始', resetOn: true, hint: G.hint };
+      if (G.tacticalLocked > 0) return { fire: '⚠ 战术技被压制 ' + Math.ceil(G.tacticalLocked) + 's', fireOn: false, reset: '↻ 重来本波', resetOn: true, hint: G.hint };
+      return { fire: G.tacticalReady ? '⚡ 战术技·全体齐射' : '战术技冷却 ' + Math.ceil(G.tacticalCd) + 's', fireOn: G.tacticalReady, reset: '↻ 重来本波', resetOn: true, hint: G.hint };
     }
     case 'RESULT': return G.result === 'win'
-      ? { fire: (G.wave === C.WAVES_PER_LEVEL - 1 ? '进入下一星区 ▶' : '下一波 ▶'), fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint }
-      : { fire: '重试本波 ↻', fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint };
-    case 'GAMEOVER': return { fire: '返回主界面', fireOn: true, reset: '重新开始', resetOn: true, hint: G.hint };
+      ? { fire: (G.wave === C.WAVES_PER_LEVEL - 1 ? '进入下一星区 ▶' : '下一波 ▶'), fireOn: true, reset: '—', resetOn: false, hint: G.hint }
+      : { fire: '重试本波 ↻', fireOn: true, reset: '—', resetOn: false, hint: G.hint };
+    case 'GAMEOVER': return { fire: '返回主界面', fireOn: true, reset: '↻ 重开本波', resetOn: true, hint: G.hint };
   }
   return { fire: '—', fireOn: false, reset: '—', resetOn: false, hint: G.hint };
 }
